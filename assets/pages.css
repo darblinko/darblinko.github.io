@@ -55,3 +55,45 @@ main td.num, main th.num { text-align: right; font-variant-numeric: tabular-nums
 .table-wrap.wide table { min-width: 560px; }
 /* A diagram narrower than a phone column keeps its natural width instead of the 520px scroll floor in site.css. */
 @media (max-width: 600px) { .mermaid.narrow svg { min-width: 0; } }
+
+.site-links { display: flex; gap: 20px; }
+
+/* CV page */
+.role { margin: 0 0 28px; }
+.role-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; column-gap: 16px; }
+.role-head h3 { margin: 0; }
+.role-head .when { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.role .context { color: var(--ink-2); font-size: 15px; margin: 2px 0 8px; }
+.history td:first-child { width: 170px; color: var(--ink-2); font-size: 15px; }
+
+@media (max-width: 600px) {
+  .history tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+  .history td { display: block; width: auto; padding: 0; border-bottom: 0; }
+}
+
+@media (max-width: 600px) { body.cv .record { grid-template-columns: minmax(0, 1fr); } }
+
+/* Printing the CV gives a plain document: no site chrome, no margin column, contact details on one line. */
+@media print {
+  body.cv { background: #fff; color: #000; font-size: 10pt; line-height: 1.4; }
+  body.cv .site-bar, body.cv footer, body.cv .note { display: none; }
+  body.cv main { max-width: none; padding: 0; }
+  body.cv section { display: block; padding: 8pt 0; }
+  body.cv p, body.cv ul, body.cv li { max-width: none; }
+  body.cv h1 { font-size: 20pt; margin-bottom: 4pt; }
+  body.cv h2 { font-size: 13pt; margin-bottom: 4pt; }
+  body.cv h3 { font-size: 11pt; }
+  body.cv .lede { font-size: 10pt; color: #000; margin-bottom: 4pt; }
+  body.cv .record { display: block; margin: 0; border: 0; background: none; }
+  body.cv .record > div { display: inline; padding: 0; border: 0; margin-right: 16pt; }
+  body.cv .record dt { display: none; }
+  body.cv .record dd { display: inline; margin: 0; font-size: 10pt; }
+  body.cv .role { margin-bottom: 10pt; }
+  body.cv .role-head { break-after: avoid; }
+  body.cv .context { font-size: 10pt; color: #333; margin-bottom: 4pt; }
+  body.cv li + li { margin-top: 1pt; }
+  body.cv li, body.cv tr { break-inside: avoid; }
+  body.cv td { padding: 3pt 6pt 3pt 0; font-size: 10pt; }
+  body.cv .history td:first-child { width: 120pt; font-size: 10pt; }
+  body.cv a { color: #000; text-decoration: none; }
+}
