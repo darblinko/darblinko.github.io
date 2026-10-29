@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ten thousand coding-agent sessions: what the counts show</title>
+  <meta name="description" content="Aggregate counts of Claude Code and Codex CLI use by one engineer from April to October 2026, and what those counts do not measure.">
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../assets/site.css">
+  <link rel="stylesheet" href="../../assets/pages.css">
+</head>
+<body>
+  <header class="site-bar">
+    <a href="../../">Mitchell Foutz</a>
+    <a href="../../#writing">All writing</a>
+  </header>
+
+  <main class="article">
+    <section class="intro">
+      <h1>Ten thousand coding-agent sessions: what the counts show</h1>
+      <p class="lede">From 2026-04-15 to 2026-10-08 the Claude Code local stats cache recorded 10,202 sessions and 282,405 messages. Codex CLI wrote 2,195 session files from 2026-04-26 to 2026-10-26. Two days in August hold 59 percent of the Claude Code sessions and 5.5 percent of its messages. The counts record volume and timing; none of them measures the quality of the work.</p>
+      <dl class="record">
+        <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
+        <div><dt>Topic</dt><dd>Agent engineering</dd></div>
+        <div><dt>Data</dt><dd>Claude Code stats cache, Codex session files</dd></div>
+        <div><dt>Period</dt><dd>2026-04-15 to 2026-10-26</dd></div>
+      </dl>
+    </section>
+
+    <section>
+      <h2>What was counted and how</h2>
+      <p>Two local records were read. Each tool writes its own record on the machine where it runs.</p>
+      <ul>
+        <li>Claude Code keeps a stats cache file in its configuration directory. The file holds one entry per active day with three counts: sessions, messages and tool calls. It also holds per-model token totals and a few summary fields. It was last computed on 2026-10-08, so its daily entries run from 2026-04-15 to 2026-10-08.</li>
+        <li>Codex CLI writes each session to a rollout file in a directory named by year, month and day. The files were counted by the date in that path, up to and including 2026-10-27, the last complete day before measurement. For every counted file the date in the file name matches the date in the path.</li>
+      </ul>
+      <p>Nothing else was read. No transcript, prompt or session file content was opened. The figures below are sums of the daily entries or of the file counts, grouped by 14-day period, by ISO week (Monday start) or by calendar month.</p>
+      <p>The files define little. The stats cache does not state what it counts as a message or as a tool call, or whether a subagent run counts as a separate session. This article uses the counts as recorded.</p>
+      <aside class="note">
+        <p>Claude Code: 134 entries in the <code>dailyActivity</code> array of the stats cache, first 2026-04-15, last 2026-10-08. The <code>lastComputedDate</code> field is 2026-10-08.</p>
+        <p>Codex CLI: 2,197 rollout files were present at measurement on 2026-10-28. Two are dated 2026-10-28 and fall after the cutoff, which leaves 2,195. Path date and file name date match for all 2,197.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Claude Code counts</h2>
+      <figure class="chart" data-chart="totals"></figure>
+      <p>Claude Code was active on 134 of the 177 calendar days from 2026-04-15 to 2026-10-08. On the median active day the cache recorded 7 sessions and 1,452 messages. Over the whole period there were 0.59 tool calls per message.</p>
+      <figure class="chart" data-chart="cc-fortnight-messages"></figure>
+      <p>Two-week message totals peak at 41,284 in the period starting 2026-05-25. Grouped by ISO week instead, the peak is 30,170, in the week starting 2026-08-10. The peak depends on the grouping. The highest single day is 2026-09-09, with 17,728 messages in 14 sessions. The cache has no entry for any day in the week starting 2026-06-15.</p>
+      <figure class="chart" data-chart="cc-monthly-sessions"></figure>
+      <p>Sessions and messages are distributed differently. August holds 7,345 of the 10,202 sessions (72.0 percent) and 26.1 percent of the messages. Most of the August sessions fall on two days: 2026-08-13 and 2026-08-14 record 6,001 sessions between them.</p>
+      <p>The per-model totals list 12 model identifiers and 206,473,081 output tokens. The largest share belongs to <code>claude-opus-5</code>, with 75,499,452 output tokens (36.6 percent). The file does not state the period those totals cover. Its daily per-model series starts later, on 2026-07-18.</p>
+      <aside class="note">
+        <p>Totals: <code>sessionCount</code>, <code>messageCount</code> and <code>toolCallCount</code> summed over the 134 daily entries. The sums equal the file's <code>totalSessions</code> (10,202) and <code>totalMessages</code> (282,405) fields. The file has no total field for tool calls.</p>
+        <p>Active days: 134 entries. 2026-04-15 to 2026-10-08 inclusive is 177 days. Medians are taken over the 134 entries. Tool calls per message: 167,392 divided by 282,405 is 0.593.</p>
+        <p>Period figures: <code>messageCount</code> summed over 14-day periods from Monday 2026-04-13, and separately by ISO week. Peak day: the entry with the highest <code>messageCount</code>. No entry is dated 2026-06-15 to 2026-06-21.</p>
+        <p>August: 7,345 of 10,202 sessions; 73,811 of 282,405 messages. Daily entries: 2026-08-13 has 2,599 sessions, 2026-08-14 has 3,402.</p>
+        <p>Models: the 12 keys of <code>modelUsage</code>, <code>outputTokens</code> summed. <code>dailyModelTokens</code> has 71 entries, 2026-07-18 to 2026-10-08.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Codex CLI session files</h2>
+      <figure class="chart" data-chart="codex-monthly-files"></figure>
+      <p>Codex CLI session files are dated on 131 distinct days, with a median of 7 files per active day. June holds 946 of the 2,195 files (43.1 percent). One day, 2026-06-25, holds 455 (20.7 percent). Inside the Claude Code window, 2026-04-15 to 2026-10-08, there are 2,133 Codex files.</p>
+      <p>A session file and a Claude Code session are different units, counted by different tools. This article does not add them together or compare their sizes.</p>
+      <aside class="note">
+        <p>Counts: rollout file names under the Codex CLI session directory, grouped by the date in the path, cutoff 2026-10-27. 131 distinct dates; the median is over those dates.</p>
+        <p>June: 946 divided by 2,195 is 43.1 percent. 2026-06-25: 455 files in that dated directory, 20.7 percent. 2,133 files are dated 2026-04-15 to 2026-10-08.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>What the counts cannot show</h2>
+      <h3>Quality of the output</h3>
+      <p>Neither record says whether a session produced working code, passed its tests, was reviewed or was kept. A message count measures traffic between the user, the model and its tools. These counts support statements about volume and timing and no others.</p>
+
+      <h3>Length of a session</h3>
+      <p>Messages per session range from 10.0 in August to 1,171.8 in April, a factor of 116.6. The longest session in the cache has 4,361 messages and a recorded duration of 224.9 hours, starting 2026-05-13.</p>
+      <table>
+        <thead>
+          <tr><th>Month</th><th class="num">Sessions</th><th class="num">Messages</th><th class="num">Messages per session</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>April (from the 15th)</td><td class="num">12</td><td class="num">14,062</td><td class="num">1,171.8</td></tr>
+          <tr><td>May</td><td class="num">799</td><td class="num">70,806</td><td class="num">88.6</td></tr>
+          <tr><td>June</td><td class="num">681</td><td class="num">31,453</td><td class="num">46.2</td></tr>
+          <tr><td>July</td><td class="num">1,078</td><td class="num">31,153</td><td class="num">28.9</td></tr>
+          <tr><td>August</td><td class="num">7,345</td><td class="num">73,811</td><td class="num">10.0</td></tr>
+          <tr><td>September</td><td class="num">189</td><td class="num">54,547</td><td class="num">288.6</td></tr>
+          <tr><td>October (to the 8th)</td><td class="num">98</td><td class="num">6,573</td><td class="num">67.1</td></tr>
+        </tbody>
+      </table>
+      <p>The monthly ratio divides the messages recorded in a month by the sessions recorded in that month. The daily session counts sum to the file's session total. Inference: each session is counted on one day, and a session that runs across several days can add messages to a month in which it is not counted as a session. The ratio is an approximate indicator for that reason.</p>
+
+      <h3>Automated sessions</h3>
+      <p>The stats cache does not mark a session as interactive or scripted. The Codex file names do not either. On 2026-08-13 and 2026-08-14 the cache records 6,001 sessions and 15,439 messages, 2.57 messages per session. Inference: these are scripted runs that each send one prompt and exit. Without those two days the cache holds 4,201 sessions and 266,966 messages, 63.55 messages per session. Inference: the 455 Codex files dated 2026-06-25 are a scripted batch of the same kind.</p>
+
+      <h3>Coverage</h3>
+      <ul>
+        <li>The stats cache stops at 2026-10-08, 20 days before this article was drafted.</li>
+        <li>The stats cache belongs to one Claude Code configuration directory. Inference: sessions run under a separate configuration directory are recorded there and are absent from these counts.</li>
+        <li>The Codex count is of files present on 2026-10-28. Files deleted before then are not counted. This article did not determine whether any were deleted.</li>
+        <li>A resumed Codex session may write to an existing file or to a new one. This article did not determine which, because it did not open the files.</li>
+      </ul>
+      <aside class="note">
+        <p>Monthly ratios: monthly sums of <code>messageCount</code> divided by monthly sums of <code>sessionCount</code>. Unrounded, 14,062 divided by 12 is 1,171.83 and 73,811 divided by 7,345 is 10.05; the factor is 116.6.</p>
+        <p>Longest session: the <code>longestSession</code> field, <code>messageCount</code> 4,361, <code>duration</code> 809,524,242 ms, timestamp 2026-05-13.</p>
+        <p>Two days: daily entries for 2026-08-13 and 2026-08-14. 6,001 of 10,202 sessions is 58.8 percent; 15,439 of 282,405 messages is 5.5 percent. The remainder is 10,202 minus 6,001 and 282,405 minus 15,439.</p>
+        <p>Codex: 455 files in the directory dated 2026-06-25.</p>
+        <p>Coverage: <code>lastComputedDate</code> 2026-10-08; measurement 2026-10-28.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Controls used with these sessions</h2>
+      <p>The controls used with these sessions are sandbox and review-gate scripts, published as <a href="https://github.com/darblinko/agent-controls">darblinko/agent-controls</a>. Neither record logs when a control ran, blocked an action or changed a result. This article makes no claim about their effect.</p>
+      <aside class="note">
+        <p>The stats cache fields are <code>dailyActivity</code>, <code>dailyModelTokens</code>, <code>modelUsage</code>, <code>longestSession</code>, <code>hourCounts</code> and summary totals. None records a control event.</p>
+      </aside>
+    </section>
+  </main>
+
+  <footer>
+    Text and figures CC BY 4.0. Figures generated from <code>data.json</code> in this directory.
+  </footer>
+
+  <script src="../../assets/charts.js" defer></script>
+</body>
+</html>

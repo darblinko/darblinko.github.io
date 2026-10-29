@@ -1,0 +1,39 @@
+{
+  "meta": {
+    "repo": "obd-scanner",
+    "revision": "89e26e5",
+    "measured": "2026-10-28"
+  },
+  "charts": [
+    {
+      "name": "dtc-coverage",
+      "type": "stats",
+      "title": "Trouble code descriptions in the app",
+      "subtitle": "Entries in q50diag/data/dtc_descriptions.py, and the 3 codes stored on the test car",
+      "source": "len() of _DESCRIPTIONS, NISSAN_DESCRIPTIONS and FORD_DESCRIPTIONS after import; describe_generic() on C1A01, C1A16, B00A0",
+      "alt": "465 SAE descriptions, 12 Nissan descriptions, 0 Ford descriptions. None of the 3 codes stored on the test car has a description.",
+      "tiles": [
+        {
+          "label": "SAE descriptions",
+          "value": "465",
+          "note": "_DESCRIPTIONS"
+        },
+        {
+          "label": "Nissan descriptions",
+          "value": "12",
+          "note": "EPS and CAN codes"
+        },
+        {
+          "label": "Ford descriptions",
+          "value": "0",
+          "note": "SAE table only"
+        },
+        {
+          "label": "Stored codes described",
+          "value": "0 of 3",
+          "note": "C1A01, C1A16, B00A0"
+        }
+      ]
+    }
+  ]
+}

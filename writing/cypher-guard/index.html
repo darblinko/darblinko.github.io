@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Checking LLM-generated Cypher before it reaches a multi-tenant graph</title>
+  <meta name="description" content="How cypher-guard checks model-written Cypher from tokens for read-only clauses and per-binding tenant scope, the 19 bypasses found in its first version, and a live run of its query corpus on Neo4j 5.26.12.">
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../assets/site.css">
+  <link rel="stylesheet" href="../../assets/pages.css">
+</head>
+<body>
+  <header class="site-bar">
+    <a href="../../">Mitchell Foutz</a>
+    <a href="../../#writing">All writing</a>
+  </header>
+
+  <main class="article">
+    <section class="intro">
+      <h1>Checking LLM-generated Cypher before it reaches a multi-tenant graph</h1>
+      <p class="lede">cypher-guard is a Python check that runs between a language model that writes Cypher and a Neo4j graph shared by several tenants. It rejects writes and requires every node and relationship variable to be compared with <code>$org_id</code> in the clause that binds it. At revision <code>657c31f</code> it rejects 79 of 79 adversarial queries with the expected error code and accepts 31 of 31 valid ones. The guard as first committed, at <code>502b403</code>, accepted 19 of those adversarial queries, and on Neo4j 5.26.12 the result of each of the 19 depends on another tenant's data.</p>
+      <dl class="record">
+        <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
+        <div><dt>Topic</dt><dd>Agent engineering</dd></div>
+        <div><dt>Source</dt><dd><a href="https://github.com/Nysara-Global-LLC/cypher-guard">Nysara-Global-LLC/cypher-guard</a></dd></div>
+        <div><dt>Revision</dt><dd><code>657c31f</code></dd></div>
+      </dl>
+    </section>
+
+    <section>
+      <h2>The model writes the query; the caller supplies the tenant</h2>
+      <p>An agent that answers questions from a graph database often lets the model write the query. In the data model cypher-guard assumes, every node and relationship carries an <code>org_id</code> property, and one query runs for one tenant. A generated query that leaves out a single <code>org_id</code> comparison can return rows that belong to another tenant.</p>
+      <p>cypher-guard runs before the query reaches the driver. <code>validate_read_query</code> either raises <code>CypherGuardError</code> with a stable code or returns the query with a row cap added. The caller sends the returned text in a read transaction and binds <code>$org_id</code> from the authenticated request. The guard checks that every binding is compared with that parameter. It cannot check which value the caller binds.</p>
+      <figure class="code">
+        <pre><code>from cypher_guard import CypherGuardError, validate_read_query
+
+try:
+    query = validate_read_query(generated_cypher)
+except CypherGuardError as error:
+    log_rejection(error.code)  # for example "UNSCOPED_ALIAS"
+else:
+    session.execute_read(lambda tx: tx.run(query, org_id=tenant_id_from_auth).data())</code></pre>
+        <figcaption>Call pattern from <code>README.md</code>, lines 38 to 47.</figcaption>
+      </figure>
+      <p>The repository is licensed Apache-2.0, copyright Nysara Global LLC, and has no runtime dependencies. Its first commit, <code>502b403</code>, imports the guard from a private source. Up to <code>eb95150</code>, the 25 commits after it split the guard into modules, move the test queries into a JSON corpus, add three benchmark scripts and fix the bypasses described below. This article describes the public repository only.</p>
+      <aside class="note">
+        <p>All file references are to <a href="https://github.com/Nysara-Global-LLC/cypher-guard">cypher-guard</a> at <code>657c31f</code> unless a revision is named.</p>
+        <p>Purpose: <code>src/cypher_guard/guard.py</code> lines 1 to 5. Call contract: lines 56 to 89. Caller binds <code>$org_id</code>: <code>README.md</code> line 49.</p>
+        <p>License: <code>README.md</code> line 160. No runtime dependencies: <code>pyproject.toml</code> line 14.</p>
+        <p>Commits: <code>git log --oneline eb95150</code> lists 26; <code>502b403</code> is "chore: import cypher-guard from private source".</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Three passes over tokens, with no Cypher grammar</h2>
+      <pre class="mermaid" role="img" aria-label="Flow diagram. Generated Cypher is tokenized once, then checked by the token rules, then by the scope walker. The LIMIT cap is applied per UNION branch, an optional schema check follows, and the query runs in a Neo4j read transaction with org_id bound by the caller. The tokenizer, the token rules and the scope walker each raise CypherGuardError with a code; the schema check raises CypherSchemaError.">
+flowchart TD
+  query["Generated Cypher"] --> lex["Tokenize once: strings become placeholders, comments dropped"]
+  lex --> rules["Token rules: writes, procedures, functions, UNION, pattern comprehensions, statements"]
+  rules --> walk["Scope walker: clauses, bindings, visibility, subqueries"]
+  walk --> limit["LIMIT cap per UNION branch"]
+  limit --> schema["Schema check, optional"]
+  schema --> driver["Neo4j read transaction, org_id bound by the caller"]
+  lex -.->|"PARSE_ERROR"| reject["CypherGuardError with a stable code"]
+  rules -.->|"code"| reject
+  walk -.->|"code"| reject
+  schema -.->|"SCHEMA code"| schemareject["CypherSchemaError"]
+      </pre>
+      <p>The guard does not build a syntax tree. The tokenizer reads the source once, left to right. It drops comments, replaces each string literal with a placeholder token, and raises <code>PARSE_ERROR</code> on input it cannot tokenize with certainty: an unterminated string or comment, unbalanced brackets, or, outside strings, comments and backtick-quoted names, any character other than ASCII letters, digits, ASCII whitespace and the Cypher operator characters. A literal such as <code>'MATCH (n) DELETE n'</code> reaches the rules as one placeholder token.</p>
+      <p>The token rules scan the whole stream and reject:</p>
+      <ul>
+        <li>a write or administrative keyword outside a string: <code>CREATE</code>, <code>MERGE</code>, <code>SET</code>, <code>DELETE</code>, <code>REMOVE</code>, <code>DROP</code>, <code>USE</code>, <code>GRANT</code>, <code>REVOKE</code>, <code>DENY</code>, <code>SHOW</code>, <code>TERMINATE</code>, <code>ALTER</code>, and the sequences <code>DETACH DELETE</code>, <code>LOAD CSV</code>, <code>IN TRANSACTIONS</code> and <code>FOREACH</code> (<code>WRITE_CLAUSE_REJECTED</code>, or <code>SUBQUERY_WRITE</code> inside a <code>CALL { }</code> body);</li>
+        <li>a procedure outside the allowlist, which by default holds only <code>db.index.vector.queryNodes</code> (<code>FORBIDDEN_PROC</code>), and an index argument to that procedure that is not a parameter (<code>VECTOR_PROC_LITERAL_INDEX</code>);</li>
+        <li>a namespaced function outside the built-in namespaces <code>date</code>, <code>datetime</code>, <code>localdatetime</code>, <code>localtime</code>, <code>time</code>, <code>duration</code>, <code>point</code> and <code>vector</code> (<code>FORBIDDEN_FUNCTION</code>);</li>
+        <li><code>UNION</code> unless the caller passes <code>allow_union=True</code> (<code>UNION_DISALLOWED</code>);</li>
+        <li>a list comprehension whose body contains a graph pattern (<code>PATTERN_COMPREHENSION_REJECTED</code>);</li>
+        <li>a semicolon anywhere but at the end, so one call runs one statement (<code>PARSE_ERROR</code>).</li>
+      </ul>
+      <p>The scope walker splits each <code>UNION</code> branch into clauses and tracks visible variables the way Neo4j does. <code>WITH</code> and <code>RETURN</code> replace the visible set with their projection. Each <code>UNION</code> branch starts empty. A <code>CALL { }</code> body sees only the names its leading <code>WITH</code> imports. The walker checks the bodies of <code>EXISTS { }</code>, <code>COUNT { }</code> and <code>COLLECT { }</code> with the names visible where they appear. It also rejects an anonymous node (<code>ANONYMOUS_NODE</code>), an <code>OR</code> in a <code>WHERE</code> that mentions <code>org_id</code> (<code>OR_WITH_SCOPE_PREDICATE</code>), and a variable-length relationship without an upper bound of at most 5 (<code>VARLEN_DEPTH</code>) or without a named path whose nodes and relationships all carry an <code>org_id</code> predicate (<code>VARLEN_INTERMEDIATE_UNSCOPED</code>).</p>
+      <p>The optional schema check compares labels, relationship types, properties and <code>(label)-[TYPE]-&gt;(label)</code> triples with a snapshot of the live schema, so a misspelled label raises <code>SCHEMA_UNKNOWN_LABEL</code> instead of returning zero rows.</p>
+      <aside class="note">
+        <p>Diagram: <code>README.md</code> lines 23 to 34. Rule order: <code>guard.py</code> lines 148 to 165.</p>
+        <p>Tokenizer: <code>src/cypher_guard/tokenizer.py</code> lines 8 to 17 and 150 to 215.</p>
+        <p>Token rules: <code>_token_rules.py</code> lines 23 to 90 (subquery writes, separator, keywords), 100 to 145 and 169 to 194 (calls, vector index argument), 199 to 219 (functions), 237 to 300 (UNION, comprehensions). Allowlists: <code>procedures.py</code> lines 17 to 36.</p>
+        <p>Scope walker: <code>_scope.py</code> lines 1 to 16, 58 (depth 5), 112 to 158, 302 to 390.</p>
+        <p>Schema codes: <code>schema_check.py</code> lines 23 to 26. Misspelled label: <code>python examples/quickstart.py</code>, last line of output.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>A binding is scoped only by the clause that introduces it</h2>
+      <p>Every node or relationship variable that a <code>MATCH</code>, <code>OPTIONAL MATCH</code> or <code>YIELD</code> introduces is a new binding, even when an earlier binding had the same name. The binding is scoped only when that clause proves <code>org_id = $org_id</code> for it. Two forms count: an inline <code>{org_id: $org_id}</code> map in the clause's pattern, or an <code>alias.org_id = $org_id</code> conjunct in the clause's own <code>WHERE</code> with no <code>OR</code> above it. A later <code>MATCH</code> or a <code>WITH ... WHERE</code> cannot scope an earlier binding. The repository gives two reasons: an <code>OPTIONAL MATCH</code> does not remove rows, and any clause in between may already have read, sorted or aggregated rows from other tenants.</p>
+      <figure class="code">
+        <pre><code>MATCH (a:Customer {org_id:$org_id})
+WITH count(a) AS n
+MATCH (a:Ticket)
+RETURN a.title</code></pre>
+        <figcaption>Corpus row <code>rebind-after-aggregation</code>, <code>corpus/adversarial.json</code> line 280, with line breaks added.</figcaption>
+      </figure>
+      <p>After <code>WITH count(a) AS n</code>, the name <code>a</code> is out of scope, and the second <code>MATCH</code> binds every <code>Ticket</code> in the graph. The guard at <code>502b403</code> recorded scoping per alias name across the whole query, so the scoped first <code>a</code> covered the second. On the two-tenant seed the query returns 4 ticket titles, and one of the 4 tickets belongs to tenant-b. At <code>657c31f</code> the second <code>a</code> is a new binding with no scope, and the guard raises <code>UNSCOPED_ALIAS</code>. This code rejects 32 of the 79 adversarial rows, more than any other code.</p>
+      <p>The strict rule rejects some queries that Neo4j would filter correctly in the end, and the README lists it as a design decision. <code>YIELD node, score</code> from the vector procedure is one case: <code>score</code> is a yielded binding with no scope, so the accepted form yields <code>node</code> only.</p>
+      <aside class="note">
+        <p>Binding rule: <code>_scope.py</code> docstring lines 8 to 15; <code>_introduce</code> lines 171 to 182; <code>_visit_where</code> lines 222 to 233; <code>_check_node_bindings</code> lines 332 to 338. Conjuncts without <code>OR</code>: <code>_syntax.py</code> lines 528 to 539.</p>
+        <p>502b403 behaviour: commit <code>48aa97c</code> message, "The walk aggregated scoping per alias name across the whole query".</p>
+        <p>4 rows: <code>benchmarks/live_check.json</code> lines 388 to 393. Tickets per tenant: <code>examples/seed.cypher</code> lines 15 to 17 and 27.</p>
+        <p>32 of 79: <code>benchmarks/rule_coverage.json</code> lines 84 to 89. Design decision: <code>README.md</code> line 149.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>19 queries the first version accepted</h2>
+      <p>The corpus records the origin of each row. 37 adversarial and 12 valid rows come from the test suite of the guard as first committed, and that guard rejected all 37 adversarial ones. 19 bypass rows are queries that guard accepted and whose result on Neo4j 5.26.12 depends on the other tenant's data. 23 adversarial and 19 valid coverage rows were added to exercise each rule and parser failure, and to test the rules that could reject a valid query by mistake.</p>
+      <div class="table-wrap wide"><table>
+        <thead>
+          <tr><th>Bypass class at <code>502b403</code></th><th class="num">Rows</th><th>Example row</th><th>First rejected at</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Lexer: a <code>//</code>, <code>/*</code> or quote inside a string or quoted name hid the rest of the query; a non-ASCII name was read as a shorter name that was already scoped</td><td class="num">4</td><td><code>string-hides-line-comment</code></td><td><code>c7d5963</code></td></tr>
+          <tr><td>Scope: a binding scoped by a later clause, bound again after <code>WITH</code>, reused across <code>UNION</code> or exempted by a <code>__</code> prefix; a procedure called without <code>YIELD</code> returned its rows directly</td><td class="num">9</td><td><code>rebind-after-aggregation</code></td><td><code>48aa97c</code></td></tr>
+          <tr><td>Pattern expressions: a pattern predicate in <code>WHERE</code>, and a pattern comprehension with an undirected <code>--</code> link</td><td class="num">3</td><td><code>pattern-predicate-in-where</code></td><td><code>f8343d5</code></td></tr>
+          <tr><td>A namespaced function that runs its own query</td><td class="num">1</td><td><code>apoc-function-runs-cypher</code></td><td><code>76e15ad</code></td></tr>
+          <tr><td><code>STARTS WITH</code> and <code>ENDS WITH</code> read as a <code>WITH</code> clause, which hid an <code>OR</code> from the scope check</td><td class="num">2</td><td><code>starts-with-hides-or</code></td><td><code>8e340ef</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>Three of the classes show how a token-level check can disagree with the database about where a construct ends:</p>
+      <ul>
+        <li><strong>Comment inside a string.</strong> The first lexer removed comments with a regular expression before it removed string literals. In <code>WHERE n.email &lt;&gt; 'x//' MATCH (m:Ticket) RETURN DISTINCT m.title</code> the guard read <code>//</code> as the start of a comment and never saw the unscoped <code>MATCH (m:Ticket)</code>. Neo4j read the string and ran the whole query.</li>
+        <li><strong>Operator read as a clause.</strong> The clause splitter treated the <code>WITH</code> of <code>STARTS WITH</code> as a new clause. In <code>WHERE t.org_id = $org_id AND t.title STARTS WITH 'T' OR true</code> the <code>WHERE</code> body ended at the operator, and the <code>OR true</code> after it was never checked.</li>
+        <li><strong>Query inside a function.</strong> <code>apoc.cypher.runFirstColumnMany('MATCH (t:Ticket) RETURN t.title', {})</code> runs a nested query that the guard sees as one string placeholder. With APOC 5.26.12 the result of the row depends on tenant-b data. The fix rejects every namespaced function outside the built-in namespaces.</li>
+      </ul>
+      <figure class="chart" data-chart="bypasses-by-revision"></figure>
+      <p>Running the current corpus against each revision reproduces the table: each class drops to 0 accepted rows at its fix commit and not before. Three later fixes changed coverage rows only. <code>ecc9ea0</code> walks <code>shortestPath</code> patterns and rejects quantified paths, <code>ea5bb01</code> matches <code>IN TRANSACTIONS</code> after a <code>CALL</code> subquery, and <code>bf289f9</code> rejects a statement separator before the end of the query.</p>
+      <aside class="note">
+        <p>Origins and counts: <code>README.md</code> lines 62 to 70; <code>benchmarks/rule_coverage.json</code> lines 6 to 11; <code>benchmarks/baseline.json</code> lines 4 to 17. Class table: <code>README.md</code> lines 76 to 82.</p>
+        <p>Example queries: <code>corpus/adversarial.json</code> lines 226, 451 and 427.</p>
+        <p>Mechanisms: commit messages of <code>c7d5963</code>, <code>8e340ef</code> and <code>76e15ad</code>. APOC row result: <code>benchmarks/live_check.json</code> lines 556 to 561. Later fixes <code>ecc9ea0</code>, <code>ea5bb01</code>, <code>bf289f9</code>.</p>
+        <p>Chart: <code>build_report(revision)</code> from <code>benchmarks/baseline.py</code> at each revision, run from <code>eb95150</code> on 2026-10-28. It is the computation behind <code>python3 benchmarks/baseline.py &lt;revision&gt;</code> (<code>README.md</code> line 74) without writing the report.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>The row cap applies to the last projection of each branch</h2>
+      <p><code>validate_read_query</code> returns the query with a row cap. A <code>UNION</code> branch whose final projection has no <code>LIMIT</code> gets <code>LIMIT 100</code>, and a larger final <code>LIMIT</code> is clamped to 100. A caller may pass a limit from 1 to 1000 in place of 100; any other value falls back to 100. A final <code>LIMIT</code> that is not a single integer literal, such as <code>LIMIT $n</code>, raises <code>PARSE_ERROR</code>. A <code>LIMIT</code> inside a subquery or on a <code>WITH</code> is left as written, because it does not bound the result.</p>
+      <p>The injector at <code>502b403</code> missed four cases. Commit <code>d921520</code> lists them, and importing each revision's guard reproduces them:</p>
+      <div class="table-wrap wide"><table>
+        <thead>
+          <tr><th>Query after <code>MATCH (a:Customer {org_id:$org_id})</code></th><th>At <code>502b403</code></th><th>At <code>eb95150</code></th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>WITH a LIMIT 1 RETURN a.name</code></td><td>Unchanged; the result has no cap</td><td><code>LIMIT 100</code> appended</td></tr>
+          <tr><td><code>RETURN a.name LIMIT 1000 // note</code></td><td>Unchanged; 1000 kept</td><td><code>LIMIT 100 // note</code></td></tr>
+          <tr><td><code>RETURN a.name LIMIT 50</code> with <code>limit=20</code></td><td>Unchanged; 50 kept</td><td><code>LIMIT 20</code></td></tr>
+          <tr><td>Two branches joined by <code>UNION</code>, <code>allow_union=True</code></td><td><code>LIMIT 100</code> after the second branch only</td><td><code>LIMIT 100</code> after each branch</td></tr>
+        </tbody>
+      </table></div>
+      <p>The cap is per branch, so a <code>UNION</code> of n branches can return n times the limit.</p>
+      <aside class="note">
+        <p>Defaults: <code>guard.py</code> lines 50 to 52. Injector: lines 92 to 145. Tests: <code>tests/test_guard.py</code> lines 113 to 149.</p>
+        <p>Table: commit <code>d921520</code> message; each row run through <code>validate_read_query</code> of both revisions, loaded with <code>guard_at</code> (<code>benchmarks/baseline.py</code> lines 51 to 66), on 2026-10-28.</p>
+        <p>Per-branch limit: <code>README.md</code> line 154.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Rule coverage at 657c31f</h2>
+      <figure class="chart" data-chart="corpus-summary"></figure>
+      <p><code>benchmarks/rule_coverage.py</code> runs every corpus row through <code>validate_read_query</code>. An adversarial row passes when the guard raises the code the row expects; a valid row passes when the guard accepts it. The report also counts how many of the 16 codes in <code>errors.py</code> at least one row raises. A test and the CI workflow fail when the committed report differs from a fresh run.</p>
+      <figure class="chart" data-chart="rejections-by-code"></figure>
+      <p>Four codes are raised by one row each. The valid rows also check the rewrite: each must end in <code>LIMIT 100</code>. On 2026-10-28 at <code>eb95150</code>, <code>rule_coverage.py --check</code> exited 0 and the test suite reported 174 passed. The suite includes the test that compares <code>benchmarks/baseline.json</code> with a fresh run against <code>502b403</code>.</p>
+      <aside class="note">
+        <p>Report: <code>benchmarks/rule_coverage.json</code> lines 6 to 16 and 17 to 114; generator <code>benchmarks/rule_coverage.py</code> lines 29 to 62 and 92 to 97. Codes: <code>src/cypher_guard/errors.py</code> lines 21 to 36.</p>
+        <p>Staleness checks: <code>tests/test_rule_coverage.py</code> lines 15 to 28; <code>.github/workflows/ci.yml</code> line 37. Baseline test: <code>tests/test_baseline.py</code> lines 33 to 35.</p>
+        <p>LIMIT on valid rows: <code>tests/test_guard.py</code> lines 70 to 75.</p>
+        <p>Commands: <code>PYTHONPATH=src python3 benchmarks/rule_coverage.py --check</code>, exit 0. <code>uvx --with pytest pytest -q -p no:cacheprovider</code>, "174 passed in 0.28s".</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Live run on Neo4j 5.26.12 with two tenants</h2>
+      <p>The corpus counts show which rows the guard rejects. They do not show which rejected rows would have read another tenant's data. <code>benchmarks/live_check.py</code> measures that on Neo4j 5.26.12 community with APOC 5.26.12 and a seed of two fictional tenants: tenant-a with 7 nodes and tenant-b with 3. Every node and relationship in the seed carries <code>org_id</code>, and no relationship joins the two tenants.</p>
+      <p>Each row runs twice, each time in a transaction that is rolled back: once on the full seed and once after the tenant-b nodes are deleted. A row whose two results differ depends on tenant-b data. Adversarial rows run without the guard, to show what it prevents. Valid rows run as the guard rewrote them.</p>
+      <figure class="chart" data-chart="live-check"></figure>
+      <ul>
+        <li>19 of 19 bypass rows depend on tenant-b data.</li>
+        <li>31 of 31 valid rows do not.</li>
+        <li>10 of 37 original rows and 2 of 23 coverage rows depend on tenant-b data.</li>
+        <li>22 of 37 original rows return the same result with or without tenant-b. The rules reject these rows for their shape. The README labels its explanation an inference: on a seed without relationships between tenants, an unscoped element reached only through a tenant-a node holds no tenant-b data.</li>
+        <li>19 adversarial rows, 5 original and 14 coverage, raise a Neo4j error or cannot be compared. One example is <code>SHOW DATABASES</code>, which Neo4j refuses in a transaction that has already written.</li>
+      </ul>
+      <p>The run was recorded on 2026-10-28 and was not repeated for this article.</p>
+      <aside class="note">
+        <p>Run: <code>benchmarks/live_check.json</code> lines 2 to 8 (date, versions, seed) and 24 to 50 (summary).</p>
+        <p>Method: <code>benchmarks/live_check.py</code> lines 1 to 16, 36 to 47 and 65 to 88. Seed: <code>examples/seed.cypher</code> lines 1 to 2 and 11 to 29; node counts in <code>SEED_COUNTS</code>, <code>live_check.py</code> line 37.</p>
+        <p>Inference and error example: <code>README.md</code> lines 95 to 96. <code>show-databases</code> result: <code>live_check.json</code> lines 163 to 169.</p>
+        <p>Reproduce: <code>README.md</code> lines 115 to 127.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Vector search ranks before the tenant filter</h2>
+      <p>One leak is documented in the repository and not fixed. The valid row <code>yield-renamed-output</code> asks the vector index for the 3 nearest tickets and keeps those of the caller's tenant:</p>
+      <figure class="code">
+        <pre><code>CALL db.index.vector.queryNodes($index, 3, $vec)
+YIELD node AS ticket
+WHERE ticket.org_id = $org_id
+RETURN ticket.title</code></pre>
+        <figcaption>Corpus row <code>yield-renamed-output</code>, <code>corpus/valid.json</code> line 112, with line breaks added.</figcaption>
+      </figure>
+      <p>For the query vector <code>[1.0, 0.0]</code> the index returns <code>a-t1</code>, <code>b-t1</code> and <code>a-t3</code>. tenant-b's ticket ranks second, and the tenant filter leaves 2 rows. The row count tells a tenant-a caller that another tenant holds a closer vector.</p>
+      <p>The differential run cannot detect this. Inside the transaction that deleted tenant-b, the index returned <code>a-t1</code> and <code>a-t3</code> and did not refill to 3. Both runs therefore return the same 2 rows, and the row is recorded as independent of tenant-b. Inference: closing the leak requires the database to filter by tenant before it ranks, which a check of the query text cannot arrange.</p>
+      <aside class="note">
+        <p>Query: <code>corpus/valid.json</code> lines 111 to 113. Result: <code>benchmarks/live_check.json</code> lines 766 to 771 (2 rows) and 51 to 62 (<code>vector_method_check</code>).</p>
+        <p>Embeddings: <code>examples/seed.cypher</code> lines 15 to 17 and 27. Query vector: <code>live_check.json</code> lines 13 to 16.</p>
+        <p>Documented limit: <code>README.md</code> line 153.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Limits of this result</h2>
+      <ul>
+        <li><strong>Token level, fail closed.</strong> Without a grammar the guard rejects some valid Cypher: <code>CALL (x) { }</code> scope-clause syntax, quantified path patterns, non-ASCII names, a final <code>LIMIT</code> that is not an integer literal, and a variable named <code>starts</code> or <code>ends</code> followed by a <code>WITH</code> clause.</li>
+        <li><strong>The corpus bounds the claim.</strong> 79 adversarial rows show that these query shapes are rejected. They do not show that no other shape passes. The first version rejected all 37 of its own adversarial tests and still accepted the 19 bypass rows.</li>
+        <li><strong>Fixed names.</strong> The property is <code>org_id</code> and the parameter is <code>$org_id</code>. Neither is configurable.</li>
+        <li><strong>Data model.</strong> Every node and relationship must carry <code>org_id</code>. The seed has no relationship between tenants, and the rows the guard accepts have not been measured on a graph that has such relationships.</li>
+        <li><strong>Admin procedures.</strong> <code>allow_admin_procs=True</code> adds <code>db.schema.visualization</code> and <code>apoc.path.subgraphAll</code>. Neither is tenant scoped.</li>
+        <li><strong>Evaluation order.</strong> The guard does not control the order in which Neo4j evaluates predicates. The README records, as an inference that no corpus row demonstrates, that an error raised by a predicate on another tenant's row before the scope filter applies could act as an oracle.</li>
+        <li><strong>Not measured.</strong> Latency, Neo4j versions other than 5.26.12, and Cypher 25 syntax.</li>
+        <li><strong>Scope of this article.</strong> It describes the public repository at <code>657c31f</code>. The bypass counts measure the guard as committed at <code>502b403</code>.</li>
+      </ul>
+      <aside class="note">
+        <p>Design decisions and limitations: <code>README.md</code> lines 146 to 156.</p>
+        <p>37 of 37 rejected at <code>502b403</code>: <code>benchmarks/baseline.json</code> lines 5 to 8.</p>
+      </aside>
+    </section>
+  </main>
+
+  <footer>
+    Text and figures CC BY 4.0. Figures generated from <code>data.json</code> in this directory.
+  </footer>
+
+  <script src="../../assets/charts.js" defer></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+    const dark = document.documentElement.dataset.theme === "dark" ||
+      (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+    mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral",
+      fontFamily: "IBM Plex Sans, system-ui, sans-serif", securityLevel: "strict" });
+  </script>
+</body>
+</html>

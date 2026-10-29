@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude writes, Codex reviews: a Stop-hook review gate capped at two rounds</title>
+  <meta name="description" content="How a Claude Code Stop hook sends uncommitted changes to Codex CLI for review, why each of its limits exists, and what 34 logged verdicts from two private repositories show.">
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../assets/site.css">
+  <link rel="stylesheet" href="../../assets/pages.css">
+</head>
+<body>
+  <header class="site-bar">
+    <a href="../../">Mitchell Foutz</a>
+    <a href="../../#writing">All writing</a>
+  </header>
+
+  <main class="article">
+    <section class="intro">
+      <h1>Claude writes, Codex reviews: a Stop-hook review gate capped at two rounds</h1>
+      <p class="lede">A Claude Code Stop hook in agent-controls runs the project's tests and a Codex CLI review of the uncommitted changes each time Claude tries to end its turn, and a change request sends Claude back to work. After 2 rounds on the same set of changed files the gate lets Claude stop and logs the open blockers. The original version of the gate logged 34 verdicts in two private repositories: 12 approvals, 18 change requests, 3 approvals at the round cap and 1 dispute.</p>
+      <dl class="record">
+        <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
+        <div><dt>Topic</dt><dd>Agent engineering</dd></div>
+        <div><dt>Source</dt><dd><a href="https://github.com/darblinko/agent-controls">darblinko/agent-controls</a></dd></div>
+        <div><dt>Revision</dt><dd><code>fb209b2</code></dd></div>
+      </dl>
+      <figure class="chart" data-chart="gate-figures"></figure>
+    </section>
+
+    <section>
+      <h2>The problem: the author decides when the work is done</h2>
+      <p>In a Claude Code session, the model that wrote a change also decides when the turn ends. Without a check that runs outside the model, that decision rests on the author's reading of its own work. The agent-controls threat model lists the resulting failure as T4: Claude stops with failing tests, or with changes no second reviewer has seen.</p>
+      <p>Claude Code runs Stop hooks when Claude is about to finish. A hook that exits 2 keeps the session going, and its stderr becomes Claude's next input. A hook that exits with another non-zero code is reported to the user and does not block. The review gate uses these exit codes to put two checks in front of the stop: the project's test command, and a review by a second agent, Codex CLI, run with a read-only sandbox and a JSON output schema.</p>
+      <p>A blocking check brings its own failure, listed as T5: a review loop that does not converge, with the agent held in it. Most of the gate's limits exist because of T5. The code is in the <a href="https://github.com/darblinko/agent-controls">agent-controls repository</a>, described on its <a href="https://darblinko.github.io/agent-controls/">project page</a>. This article cites it at revision <code>fb209b2</code>.</p>
+      <aside class="note">
+        <p>T4 and T5: <code>docs/threat-model.md</code> lines 23 and 24.</p>
+        <p>Exit codes 0, 2 and 1: header of <code>hooks/codex-review-gate.sh</code>, lines 11 to 15.</p>
+        <p>Codex invocation with <code>--sandbox read-only</code> and <code>--output-schema</code>: <code>hooks/codex-review-gate.sh</code> lines 269 to 271. Schema: <code>templates/codex_review_schema.json</code>.</p>
+        <p>All line numbers in this article are at <code>fb209b2</code>, from <code>git rev-parse --short HEAD</code>.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>How the gate runs</h2>
+      <pre class="mermaid">
+flowchart TD
+  stop(["Claude tries to stop"]) --> checks{"changes to review?"}
+  checks -->|"no"| a0["exit 0"]
+  checks -->|"yes"| tests{"tests pass?"}
+  tests -->|"no"| b1["exit 2: test output to Claude"]
+  tests -->|"yes"| codex["Codex review of the capped prompt"]
+  codex --> verdict{"verdict"}
+  verdict -->|"none"| e1["exit 1: no approval"]
+  verdict -->|"APPROVED"| a1["exit 0: approval written"]
+  verdict -->|"CHANGES_REQUESTED"| rounds{"rounds left?"}
+  rounds -->|"yes"| b2["exit 2: review to Claude"]
+  rounds -->|"no"| a2["exit 0: blockers logged"]
+  b1 -.->|"stops again"| stop
+  b2 -.->|"stops again"| stop
+      </pre>
+      <p>The diagram follows <code>main()</code> and folds the checks before the review into its first decision: a disabled gate, a lock held by another run, no uncommitted changes, and a working state that is already approved each lead to exit 0. A setup error leads to exit 1. An exit 2 sends Claude back to work, and its next attempt to stop runs the gate again. The three exit codes map to three outcomes in Claude Code:</p>
+      <table>
+        <thead>
+          <tr><th>Exit</th><th>When</th><th>Effect</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>0</td><td>Gate disabled; live lock held by another run; no uncommitted changes; working state already approved; <code>APPROVED</code>; <code>CHANGES_REQUESTED</code> in the last round</td><td>Claude stops</td></tr>
+          <tr><td>2</td><td>Test command fails; <code>CHANGES_REQUESTED</code> with rounds left</td><td>Claude continues, with stderr as its input</td></tr>
+          <tr><td>1</td><td>Setup error; Codex exits non-zero; no review file; review cannot be parsed</td><td>The user sees stderr and Claude stops; no approval is written</td></tr>
+        </tbody>
+      </table>
+      <p>An approval records a hash of HEAD, the short status, the diff against HEAD and the content of every untracked file. Any later edit changes the hash, and the next stop reviews again. A verdict of <code>APPROVED</code> that lists blocking issues is treated as <code>CHANGES_REQUESTED</code>.</p>
+      <aside class="note">
+        <p>Flow: <code>main()</code>, <code>hooks/codex-review-gate.sh</code> lines 338 to 360.</p>
+        <p>Checks before the review, in order: disabled (lines 340 to 344); setup, meaning a git repository (line 39), a baseline commit (line 78) and the reviewer template and schema under <code>.ai/</code> (lines 83 to 88), with exit 1 on failure; live lock (line 346); uncommitted changes whose working state has no matching approval (lines 347 to 354).</p>
+        <p>Exit points: lines 104, 343, 349 and 353 (pass-through), 173 and 326 (block), 41, 80, 86, 277, 282 and 333 (exit 1), 310 and 320 (stop after a verdict).</p>
+        <p>Working-state hash: lines 117 to 128; written at line 293, compared at lines 130 to 139.</p>
+        <p>APPROVED with blockers: <code>hooks/review_gate.py</code> lines 52 and 53.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Round cap: 2 rounds per batch</h2>
+      <p><code>REVIEW_GATE_MAX_ROUNDS</code> defaults to 2. Round 1 is a full review. In later rounds the prompt carries the previous review and tells Codex to verify only that its blockers were fixed, and to raise no new blocker unless the fix caused a regression. The reviewer instructions add a severity rule: only P0 and P1 issues block, and P2 issues are suggestions.</p>
+      <pre><code>    CHANGES_REQUESTED)
+      printf '%s\n' "$ROUND" &gt;"$ROUND_FILE"
+      if ((ROUND &gt;= MAX_ROUNDS)); then
+        write_approval true max_rounds_reached
+        log_event AUTO_APPROVED "$blocking unresolved blocker(s) after $ROUND round(s)"
+        log_decision AUTO_APPROVED "$blocking blocker(s) unresolved after $ROUND of $MAX_ROUNDS rounds"
+        echo "Codex still requests changes after round $ROUND of $MAX_ROUNDS."
+        echo "Round limit reached: stopping is allowed. Unresolved blockers are in $DECISION_LOG."
+        exit 0
+      fi
+      log_event CHANGES_REQUESTED "$blocking blocking issue(s)"
+      log_decision CHANGES_REQUESTED "$blocking blocking issue(s) in round $ROUND"
+      echo "Codex requested changes (round $ROUND of $MAX_ROUNDS). Fix these, then stop again:" &gt;&amp;2
+      cat "$REVIEW_FILE" &gt;&amp;2
+      exit 2
+      ;;</code></pre>
+      <p><strong>Failure it prevents.</strong> A reviewer that raises a new blocker in each round can keep Claude working without end. The threat model labels this rationale an inference; it is not measured.</p>
+      <p><strong>What it costs.</strong> At the cap, Claude stops with the blockers still open. The approval file records <code>auto_approved=true</code> and <code>override_reason=max_rounds_reached</code>, and the decision log <code>.ai/reports/qa_decisions.jsonl</code> records the review. A person has to read that log; the gate takes no further action on it.</p>
+      <p><strong>Design decision: a round counts only when Codex returns a verdict.</strong> The round counter is written in one place, the first line of the <code>CHANGES_REQUESTED</code> branch above. A failing test command exits earlier, and so does a Codex failure. Inference: if those runs used rounds, a Codex outage in round 1 followed by one change request in round 2 would end in an approval at the cap after a single review.</p>
+      <p>Claude Code also passes Stop hooks a <code>stop_hook_active</code> field, which is true when the session is already continuing because of a Stop hook. The gate does not read its hook input. Its loop bound is the round counter file.</p>
+      <aside class="note">
+        <p>Excerpt: <code>hooks/codex-review-gate.sh</code> lines 312 to 327. Default: line 60.</p>
+        <p>Fix-verification prompt: lines 209 to 218. Severity rule: <code>templates/codex_reviewer.md</code> line 19.</p>
+        <p>Rationale labeled inference: <code>docs/threat-model.md</code> line 94. Open blockers after the cap: line 98.</p>
+        <p>Approval fields: lines 288 to 297. Earlier exits: tests at line 173, Codex at lines 277 and 282.</p>
+        <p>Tests: <code>test_second_round_verifies_fixes_then_overrides_at_the_cap</code>, <code>test_round_cap_is_configurable</code>, <code>test_failing_tests_block_without_using_a_round</code>, <code>test_reviewer_failure_does_not_use_a_round</code>.</p>
+        <p><code>stop_hook_active</code>: Claude Code hooks reference, Stop hook input. The script reads no standard input.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Batches and the stale review</h2>
+      <pre><code>start_round() {
+  local batch previous="" completed=0
+  batch=$(project_changes | sort | git hash-object --stdin)
+  [[ -f $BATCH_FILE ]] &amp;&amp; previous=$(&lt;"$BATCH_FILE")
+  if [[ $batch != "$previous" ]]; then
+    rm -f "$ROUND_FILE" "$REVIEW_FILE"
+    printf '%s\n' "$batch" &gt;"$BATCH_FILE"
+  fi
+  [[ -f $ROUND_FILE ]] &amp;&amp; completed=$(&lt;"$ROUND_FILE")
+  [[ $completed =~ ^[0-9]+$ ]] || completed=0
+  ROUND=$((completed + 1))
+  log_event HOOK_START "round=$ROUND/$MAX_ROUNDS"
+}</code></pre>
+      <p>The cap applies per batch. The batch identifier is a hash of the sorted <code>git status --short</code> output. When it changes, the gate deletes the round counter and the previous review together and starts at round 1. An approval also deletes the counter and the batch file.</p>
+      <p><strong>Design decision: delete the previous review with the counter.</strong> The fix-verification section quotes the review file only when the round is above 1. After a reset the round is 1, so that section is skipped in either case. Deleting the file as well means a review of a file set that is no longer in play cannot be quoted in a later round. Inference: this protects against a future change to the order of these steps; the current code does not need it.</p>
+      <p><strong>Observation: staging starts a new batch.</strong> Each line of the short status carries two status letters. <code>git add</code> on an untracked file changes its line from <code>??</code> to <code>A</code>, which changes the hash. With a stub reviewer that always requests changes, the gate at <code>fb209b2</code> reported round 1 of 2, then, after <code>git add</code> and no content change, round 1 of 2 again. The README and the threat model state both cases: a fix that touches a new file starts at round 1, and staging with no content change does as well. Both documents gained the staging case at <code>b8fc30e</code>. Inference: the cap bounds rounds per file set and status, and an agent that stages files between rounds resets it.</p>
+      <aside class="note">
+        <p>Excerpt: <code>hooks/codex-review-gate.sh</code> lines 141 to 153. Status command: lines 113 to 115. Reset on approval: line 298. Previous-review condition: line 209.</p>
+        <p>New file set and staging: <code>docs/threat-model.md</code> line 102; <code>README.md</code> line 79. Test: <code>test_new_file_set_restarts_at_round_one</code>, which checks the round and the prompt, not the deletion of the review file.</p>
+        <p>Staging run: a scratch git repository with the templates copied to <code>.ai/</code>, a stub <code>codex</code> returning one P1 blocker, one untracked file; gate run, <code>git add</code>, gate run, gate run, at <code>fb209b2</code>. The first two runs exited 2 with "round 1 of 2". The third exited 0 with "round 2 of 2". The decision log shows two round-1 <code>CHANGES_REQUESTED</code> entries and one round-2 <code>AUTO_APPROVED</code> entry.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Prompt cap: 204,800 bytes</h2>
+      <p><code>REVIEW_GATE_MAX_PROMPT_BYTES</code> defaults to 204,800 bytes, which is 200 KiB. The prompt is assembled in this order: reviewer instructions, round section, project scope, Claude's summary, test output, git status, staged diff, unstaged diff and untracked files. Three bounds apply:</p>
+      <ul>
+        <li>Each diff section is cut at the cap with <code>head -c</code>.</li>
+        <li>An untracked file with a binary extension is named and skipped. An untracked file over 51,200 bytes contributes its first 200 lines.</li>
+        <li>If the assembled prompt is still over the cap, it is cut to the cap, a <code>[TRUNCATED]</code> marker is appended, and a <code>PROMPT_TRUNCATED</code> event is logged with the original size.</li>
+      </ul>
+      <pre><code>  PROMPT_BYTES=$(wc -c &lt;"$PROMPT_FILE")
+  if ((PROMPT_BYTES &gt; MAX_PROMPT_BYTES)); then
+    log_event PROMPT_TRUNCATED "original=${PROMPT_BYTES} bytes, cap=${MAX_PROMPT_BYTES}"
+    head -c "$MAX_PROMPT_BYTES" "$PROMPT_FILE" &gt;"$PROMPT_FILE.tmp"
+    printf '\n\n[TRUNCATED: prompt exceeded %s bytes]\n' "$MAX_PROMPT_BYTES" &gt;&gt;"$PROMPT_FILE.tmp"
+    mv "$PROMPT_FILE.tmp" "$PROMPT_FILE"
+    PROMPT_BYTES=$(wc -c &lt;"$PROMPT_FILE")
+  fi</code></pre>
+      <p><strong>Failure it prevents.</strong> A prompt that grows with the diff without a limit. The repository does not state why 204,800 bytes was chosen or which Codex context limit it was sized against.</p>
+      <p><strong>What it costs.</strong> The review runs on the cut prompt and can return <code>APPROVED</code>. Truncation is logged; it does not fail the review. The cut is taken from the end, so the unstaged diff and the untracked files are the first content lost (inference from the section order). The decision log stores the prompt size after truncation. At the default cap a cut prompt is 204,844 bytes, the cap plus the 44-byte marker, so that <code>prompt_bytes</code> value marks a review of a cut prompt.</p>
+      <aside class="note">
+        <p>Default: <code>hooks/codex-review-gate.sh</code> line 61. Section order: lines 238 to 254. Diff bound: line 180.</p>
+        <p>Binary extensions: line 31, applied at lines 188 to 190. Untracked file limit: line 32, applied at lines 192 to 196.</p>
+        <p>Excerpt: lines 255 to 262. <code>prompt_bytes</code> in the decision entry: <code>hooks/review_gate.py</code> line 91. Marker length: <code>printf</code> of the line 259 format with 204800, piped to <code>wc -c</code>, gives 44.</p>
+        <p>Partial review listed as a gap: <code>docs/threat-model.md</code> line 100. Tests: <code>test_prompt_is_capped</code>, <code>test_binary_untracked_files_are_not_inlined</code>.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Time bounds: the hook timeout and the lock</h2>
+      <p>The gate sets no timeout on the Codex call. Its run time is bounded by the <code>timeout</code> field of the hook entry in Claude Code settings, which is 1,200 seconds in the example settings file.</p>
+      <p>The 1,500-second default in the script is a lock age. Each run writes its process ID and start time to a lock file and removes the file on exit. A stop that finds a lock held by a live process and younger than 1,500 seconds logs a skip and exits 0. A lock held by a dead process, or older than the limit, is cleared.</p>
+      <pre><code>  local stale=${REVIEW_GATE_LOCK_STALE_SECONDS:-1500} lock_pid lock_time elapsed
+  if [[ -f $LOCK_FILE ]]; then
+    lock_pid=$(sed -n 1p "$LOCK_FILE")
+    lock_time=$(sed -n 2p "$LOCK_FILE")
+    [[ $lock_time =~ ^[0-9]+$ ]] || lock_time=0
+    elapsed=$(($(date +%s) - lock_time))
+    if [[ $lock_pid =~ ^[0-9]+$ ]] &amp;&amp; kill -0 "$lock_pid" 2&gt;/dev/null &amp;&amp; ((elapsed &lt; stale)); then
+      log_event HOOK_SKIP "lock held by live pid=$lock_pid (${elapsed}s old)"
+      exit 0
+    fi</code></pre>
+      <p><strong>Failures it prevents.</strong> Two stops in one working tree starting two Codex reviews that write the same report files, and a lock left by a killed hook disabling the gate.</p>
+      <p><strong>What it costs.</strong> The second stop ends without a review of its own. Inference: when both sessions share the working tree, the first review covers the same files, except for edits made after its prompt was built.</p>
+      <p><strong>Observation.</strong> The 1,500-second lock age is above the 1,200-second hook timeout in the example settings, so a review that stays within the hook timeout keeps its lock against a second stop. The default was 900 seconds until <code>a5d20b6</code>. A test reads the timeout from the example settings, checks that a live lock one second younger than the timeout is kept, and checks that a live lock twice that age is taken over. Inference: a second review can start in parallel only if the process holding the lock outlives the hook timeout by 300 seconds, or if the hook timeout is set at or above the lock age and a review runs past the lock age.</p>
+      <aside class="note">
+        <p>Codex call without a timeout: <code>hooks/codex-review-gate.sh</code> lines 269 to 271. Hook timeout: <code>examples/claude-settings.json</code> line 9.</p>
+        <p>Excerpt: lines 96 to 105. Lock write and removal: lines 109 and 110. Clearing: lines 106 and 107.</p>
+        <p>Tests: <code>test_live_lock_skips_the_review</code>, <code>test_lock_of_a_dead_process_is_cleared</code>, <code>test_live_lock_is_taken_over_by_age_only_after_the_hook_timeout</code> (<code>tests/test_review_gate.py</code> line 283). Threat model row: <code>docs/threat-model.md</code> line 92.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>A reviewer failure exits 1 and does not block</h2>
+      <pre><code>  if ! "$codex" exec --ephemeral --sandbox read-only --cd "$PROJECT_ROOT" \
+    --output-schema "$SCHEMA_FILE" --output-last-message "$new_review" \
+    - &lt;"$PROMPT_FILE" &gt;"$CODEX_LOG" 2&gt;&amp;1; then
+    log_event CODEX_ERROR "see $CODEX_LOG"
+    {
+      echo "codex-review-gate: Codex review failed; no approval was recorded. Last output:"
+      tail -20 "$CODEX_LOG"
+    } &gt;&amp;2
+    exit 1
+  fi</code></pre>
+      <p>When Codex exits non-zero, writes no review file, or returns a review the helper cannot parse, the gate exits 1 and prints the last output. Claude Code shows it to the user and lets Claude stop. No approval is written and no round is used.</p>
+      <p><strong>Design decision.</strong> In the original gate a reviewer failure blocked the stop. The published version does not block, because Claude cannot repair a Codex outage from inside the session, and a gate that blocked on its own failures could hold Claude in a loop it cannot resolve.</p>
+      <p><strong>What it costs.</strong> During an outage, sessions end with unreviewed changes and an error in front of the user. No approval exists, so the next stop with uncommitted changes runs the review again. Changes committed before that stop are not reviewed.</p>
+      <aside class="note">
+        <p>Excerpt: <code>hooks/codex-review-gate.sh</code> lines 269 to 278. No review file: lines 279 to 283. Unparseable review: lines 328 to 334.</p>
+        <p>Rationale: <code>README.md</code> line 191. Re-review after a failure: lines 130 to 139.</p>
+        <p>Tests: <code>test_reviewer_failures_neither_block_nor_approve</code> with 4 cases (Codex fails, no review file, not JSON, unknown status), <code>test_reviewer_failure_does_not_use_a_round</code>.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Turning the gate off: a marker file</h2>
+      <p>The gate passes through when <code>REVIEW_GATE_DISABLE=1</code> is set in the hook's environment or when the file <code>.ai/reports/disabled</code> exists. The example <code>/review-gate</code> command creates and removes that file.</p>
+      <p><strong>Design decision.</strong> The switch is a file because an environment variable exported from a Claude Code Bash tool call does not reach the hook process.</p>
+      <p><strong>What it costs.</strong> Claude can create the file itself. The threat model recommends denying writes to that path in Claude Code permissions where this matters.</p>
+      <aside class="note">
+        <p>Check: <code>hooks/codex-review-gate.sh</code> lines 91 to 93. Command: <code>examples/review-gate-command.md</code> lines 10 to 14.</p>
+        <p>Rationale: <code>README.md</code> line 192. Gap: <code>docs/threat-model.md</code> line 104.</p>
+        <p>Test: <code>test_disabled_gate_passes_without_review</code>, cases <code>env</code> and <code>marker</code>.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>What the tests cover</h2>
+      <p>pytest collects 72 tests at <code>fb209b2</code>, and all 72 pass. 28 are in <code>tests/test_review_gate.py</code>, 26 in <code>tests/test_codex_sandbox.py</code>, 13 in <code>tests/test_claude_profiles.py</code> and 5 in <code>tests/test_links.py</code>. Each gate test builds a throwaway git repository and replaces Codex with a stub that records the prompt it receives and returns a fixed verdict.</p>
+      <figure class="chart" data-chart="tests-by-area"></figure>
+      <p>No test covers these behaviors: deletion of the previous review on a batch change, untracked files over 51,200 bytes, a batch change caused by staging, and the real Codex CLI. The README lists the same four as untested. Inference: the stub returns JSON that matches the schema, so the tests do not show how often Codex itself returns a verdict the gate can parse.</p>
+      <aside class="note">
+        <p>Counts: <code>uvx pytest --collect-only -q</code> (pytest 9.2.0), 72 collected. Run: <code>uvx pytest -q -p no:cacheprovider</code> with a new temporary <code>HOME</code>, 72 passed in 5.03 s, on 2026-10-28. Untested list: <code>README.md</code> line 190.</p>
+        <p>Stub and fixture: <code>tests/test_review_gate.py</code> lines 1 to 5, 20 to 33 and 106 to 124.</p>
+        <p>Grouping of the 28 gate tests is by test name. Reviewer failures: 4 parametrized cases and the round test. Blocking and round cap: changes requested, second round with override, configurable cap, new file set, approval with blockers. Approval binding: recorded, not reviewed twice, edit after approval. The remaining groups follow their names.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Review records from two private repositories</h2>
+      <p>The original gate ran in two private repositories. It overwrote one review file per round, so the history is in two logs: an activity log with one line per event, and a decision log with one JSON line per verdict. For this article, only the timestamp, round and event fields of the activity logs were read, and the outcome, round and timestamp fields of the decision logs. No review text was opened.</p>
+      <p>The two activity logs hold 54 and 366 lines, dated 2026-04-29 to 2026-05-10. They record 34 verdicts and 39 Codex calls.</p>
+      <figure class="chart" data-chart="verdicts-by-round"></figure>
+      <ul>
+        <li>15 verdicts are in round 1, 13 in round 2 and 6 in rounds 3 to 7.</li>
+        <li>2 of the 12 approvals came in round 1 and 8 in round 2.</li>
+        <li>3 of the 34 verdicts are approvals at the round cap, all in round 2. In those 3 cases Claude stopped with blockers open.</li>
+        <li>All 6 verdicts above round 2 are from one repository and are dated 2026-04-29. That repository's only approval at the cap is dated 2026-05-03. Inference: the 2-round cap applied there from a date between those two. The logs do not record when it was installed.</li>
+        <li>One verdict has the outcome <code>DISPUTED</code>, which the published gate does not write. Its repository logs 11 verdicts and 10 Codex calls. Inference: the disputed entry was written without a Codex call.</li>
+      </ul>
+      <figure class="chart" data-chart="codex-calls"></figure>
+      <p>3 of the 39 Codex calls exited with an error, and 3 have no completion or error line. Under the original gate those errors blocked the stop. One repository logs 10 Codex calls in round 2 against 6 change requests in round 1. Inference: the original counter could reach round 2 without a logged change request, either through runs that returned no verdict or through loops that began before the log did. The published version counts a round only on a verdict.</p>
+      <p>The decision logs hold 11 and 4 lines. The shorter one starts on 2026-05-02 and covers 4 of the 23 verdicts in its repository's activity log, so the activity logs are the more complete record.</p>
+      <p>The records do not show whether a blocker was correct, whether the blockers open at the cap were fixed later, or what a review cost. Durations were not tallied for this article.</p>
+      <aside class="note">
+        <p>Verdicts: activity log lines with event <code>APPROVED</code>, <code>CHANGES_REQUESTED</code>, <code>AUTO_APPROVED</code> or <code>DISPUTED</code>, counted by the <code>round=N</code> field. Repository 1: 11 (rounds 1 and 2 only). Repository 2: 23.</p>
+        <p>Codex calls: <code>CODEX_INVOKE</code> 10 and 29; <code>CODEX_COMPLETE</code> 10 and 23; <code>CODEX_ERROR</code> 0 and 3. 39 minus 33 minus 3 leaves 3 with neither line.</p>
+        <p>Round 3 to 7 verdicts: 2 approvals (rounds 3 and 7) and 4 change requests (rounds 3 to 6), all in repository 2, dated 2026-04-29. Round-2 calls in repository 2: 10; round-1 change requests: 6.</p>
+        <p>Decision logs: <code>outcome</code> and <code>round</code> fields agree with the activity log counts for the dates they cover. Date ranges: 2026-05-06 to 2026-05-10 and 2026-05-02 to 2026-05-03.</p>
+        <p>Repository 1 also tracks 54 files in its report directory. 22 are review files in subdirectories that the hook's path settings do not name; they are excluded. The logs are not tracked.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>What the gate cannot catch</h2>
+      <ul>
+        <li><strong>Committed work.</strong> The gate reviews uncommitted changes. Work Claude commits before it stops is not reviewed.</li>
+        <li><strong>Blockers at the cap.</strong> They are logged. Nothing in the gate acts on them.</li>
+        <li><strong>Cut prompts.</strong> A truncated prompt is reviewed and can be approved. Truncation is logged as an event.</li>
+        <li><strong>Skipped or missing tests.</strong> With <code>REVIEW_GATE_SKIP_TESTS=1</code>, or with no <code>REVIEW_GATE_TEST_CMD</code>, the review runs without tests and can still end in an approval at the cap.</li>
+        <li><strong>The reviewer's accuracy.</strong> No step checks whether a Codex blocker is correct. An approval is a second agent's opinion of the diff it was shown.</li>
+        <li><strong>Concurrent sessions in one tree.</strong> A stop that finds a live lock exits 0 without tests or a review.</li>
+        <li><strong>Data sent to the reviewer.</strong> Codex receives the diffs, the untracked files and the test output. The threat model recommends running the gate's Codex call through the repository's sandbox wrapper.</li>
+        <li><strong>Cost and latency.</strong> The repository records no timing or token figures, and this article reports none.</li>
+      </ul>
+      <aside class="note">
+        <p>Uncommitted scope: <code>hooks/codex-review-gate.sh</code> lines 113 to 115; <code>README.md</code> line 188.</p>
+        <p>Blockers at the cap: <code>docs/threat-model.md</code> line 98. Truncation: lines 256 to 262 of the hook.</p>
+        <p>Tests skipped or not configured: hook lines 155 to 165; approval at the cap: lines 314 to 320.</p>
+        <p>Lock skip: hook lines 102 to 104; <code>README.md</code> line 189; <code>docs/threat-model.md</code> line 103. Data sent to Codex: <code>docs/threat-model.md</code> line 105.</p>
+      </aside>
+    </section>
+  </main>
+
+  <footer>
+    Text and figures CC BY 4.0. Figures generated from <code>data.json</code> in this directory.
+  </footer>
+
+  <script src="../../assets/charts.js" defer></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+    const dark = document.documentElement.dataset.theme === "dark" ||
+      (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+    mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral",
+      fontFamily: "IBM Plex Sans, system-ui, sans-serif", securityLevel: "strict" });
+  </script>
+</body>
+</html>

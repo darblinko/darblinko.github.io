@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "repo": "llm-trading-lab",
+    "revision": "78e7b53",
+    "measured": "2026-10-28"
+  },
+  "charts": [
+    {
+      "name": "stage-a-by-check",
+      "type": "hbar",
+      "title": "Stage A setup families passing each gate check, out of 8",
+      "subtitle": "In-sample run, 2016 to 2021. A family passes the gate only when it passes all six checks",
+      "source": "llm-trading-lab data/results/stage_a_gate_results.csv rows 2 to 9, columns min_events to control; thresholds from GateRules, src/swing_backtest/stats.py lines 254 to 262",
+      "alt": "Of 8 families, 6 pass the 150-event minimum, 7 the 24-month minimum, 0 the mean R minimum of 0.15, 0 the bootstrap interval check, 1 the recent-years check and 2 the matched-control check.",
+      "format": "number",
+      "max": 8,
+      "data": [
+        {"label": "150 or more distinct events", "value": 6, "note": "fail: compression_breakout 82, earnings_gap 32"},
+        {"label": "24 or more entry months", "value": 7, "note": "fail: earnings_gap"},
+        {"label": "Mean R at least 0.15", "value": 0, "note": "highest: weekly_fade 0.021"},
+        {"label": "90% lower bound above 0", "value": 0, "note": "highest lower bound: period_failure -0.0504"},
+        {"label": "Positive in 2 of 3 recent years", "value": 1, "note": "pass: period_failure"},
+        {"label": "Beats matched control", "value": 2, "note": "pass: range_edge, period_failure"}
+      ]
+    },
+    {
+      "name": "b17-win-rate",
+      "type": "hbar",
+      "title": "Win rate of the six b17 entry models against the 40% gate",
+      "subtitle": "Share of backtest trades won per model, 11,453 to 31,657 trades each",
+      "source": "llm-trading-lab data/results/b17_gate_results.csv rows 2 to 7, columns trades, win_rate and gate_win_rate_gt_40pct",
+      "alt": "Win rates range from 33.6 percent for scalp_put to 38.6 percent for trend_put. All six are below the 40 percent gate and fail it.",
+      "format": "percent",
+      "max": 0.5,
+      "threshold": {"value": 0.4, "label": "gate 40%"},
+      "data": [
+        {"label": "scalp_call", "value": 0.3662, "status": "fail", "note": "12,787 trades"},
+        {"label": "scalp_put", "value": 0.336, "status": "fail", "note": "21,323 trades"},
+        {"label": "meanrev_call", "value": 0.3672, "status": "fail", "note": "23,457 trades"},
+        {"label": "meanrev_put", "value": 0.3437, "status": "fail", "note": "31,657 trades"},
+        {"label": "trend_call", "value": 0.357, "status": "fail", "note": "11,453 trades"},
+        {"label": "trend_put", "value": 0.3861, "status": "fail", "note": "13,341 trades"}
+      ]
+    },
+    {
+      "name": "llm-entry-direction",
+      "type": "hbar",
+      "title": "Direction-correct rate of triggered signals, by LLM entry decision",
+      "subtitle": "13 sessions, 2026-05-26 to 2026-06-11. Correct means the underlying moved in the signal's direction over the next 15 minutes",
+      "source": "llm-trading-lab data/results/expectancy_gate_lift.csv rows 2 to 4",
+      "alt": "Signals the LLM executed were direction-correct 45.9 percent of the time over 37 signals. Signals it gated out were direction-correct 49.6 percent of the time over 115 signals. All 152 triggered signals: 48.7 percent.",
+      "format": "percent",
+      "max": 1,
+      "data": [
+        {"label": "Executed (LLM said go)", "value": 0.459, "note": "37 signals"},
+        {"label": "Gated out (LLM said wait)", "value": 0.496, "note": "115 signals"},
+        {"label": "All triggered signals", "value": 0.487, "note": "152 signals"}
+      ]
+    },
+    {
+      "name": "llm-entry-confidence",
+      "type": "columns",
+      "title": "Triggered and executed signals by LLM confidence level",
+      "subtitle": "152 signals triggered and 37 executed over the same 13 sessions",
+      "source": "llm-trading-lab data/results/expectancy_confidence.csv rows 2 to 4, columns triggered and executed",
+      "alt": "High confidence: 1 signal triggered, 0 executed. Medium: 112 triggered, 29 executed. Low: 39 triggered, 8 executed.",
+      "format": "number",
+      "categories": ["high", "medium", "low"],
+      "series": [
+        {"name": "triggered", "values": [1, 112, 39]},
+        {"name": "executed", "values": [0, 29, 8]}
+      ]
+    }
+  ]
+}

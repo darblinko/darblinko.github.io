@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Evaluating an agentic RAG system for regulatory audit support</title>
+  <meta name="description" content="How the golden-goose eval battery scores retrieval, routing, citations and sentence support on a synthetic medical device QMS, how its gates were set, what the seed-42 run scored, and which ADRs refer to the measurement.">
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../assets/site.css">
+  <link rel="stylesheet" href="../../assets/pages.css">
+</head>
+<body>
+  <header class="site-bar">
+    <a href="../../">Mitchell Foutz</a>
+    <a href="../../#writing">All writing</a>
+  </header>
+
+  <main class="article">
+    <section class="intro">
+      <h1>Evaluating an agentic RAG system for regulatory audit support</h1>
+      <p class="lede">The golden-goose eval battery fails a run when any of 7 metric gates, a non-leakage check or 5 coverage floors is missed. On a synthetic quality system for a fictional infusion pump, the recorded seed-42 run passed all of them, with recall@10 of 94.4% and routing accuracy of 98.1% (212 of 216 questions). Its 100% grounded answer rate was measured with a fake extractive generator, so it tests the citation path and does not measure a hosted model's answers.</p>
+      <dl class="record">
+        <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
+        <div><dt>Topic</dt><dd>Enterprise: regulated quality</dd></div>
+        <div><dt>Source</dt><dd><a href="https://github.com/darblinko/golden-goose">darblinko/golden-goose</a></dd></div>
+        <div><dt>Revision</dt><dd><code>3654d96</code></dd></div>
+      </dl>
+    </section>
+
+    <section>
+      <h2>Scope: what the system is for and what was measured</h2>
+      <p>golden-goose is a LangGraph agent that answers questions about a medical device quality management system. It uses hybrid retrieval in Qdrant, a Neo4j graph and a Postgres record warehouse, and each answer cites document ID, revision and page. Its <a href="https://darblinko.github.io/golden-goose/">project page</a> describes the system and the <a href="https://github.com/darblinko/golden-goose">repository</a> holds the code. This article covers the eval battery: what each metric computes, how the gates were set, what the one recorded run scored, and which architecture decision records (ADRs) refer to the measurement.</p>
+      <p>The intended-use statement scopes the system to decision support during regulatory audit preparation and live audit response. A trained user opens the cited revision and confirms each claim before relying on it. A human writes the response to the auditor. The system is read-only over quality records and is not a 21 CFR Part 11 electronic record or signature system.</p>
+      <p>All evaluation data is synthetic. The repository generates a QMS for the fictional Halvern Medical infusion pump family, together with a golden question set and seeded defects. No figure in this article was measured on a real company's documents.</p>
+      <aside class="note">
+        <p>System description: <code>README.md</code> lines 3 to 5. Intended use: <code>docs/validation/intended-use.md</code> lines 15 to 20; human response lines 45 and 46; read-only and Part 11 lines 38 and 47 to 48; synthetic data lines 59 to 61.</p>
+        <p>Corpus: <code>README.md</code> line 30; company name in <code>docs/results/corpus-manifest-seed42.json</code> line 4.</p>
+        <p>Code is cited at <code>3654d96</code> (<code>git rev-parse --short HEAD</code>). The run was at <code>055e6fe</code>; <code>git diff --name-only 055e6fe 3654d96</code> lists <code>README.md</code>, files under <code>docs/</code>, and two source files whose changes are comment lines only, so the eval code is the same at both apart from comments.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>The pipeline: one corpus, four evals, one gate decision</h2>
+      <pre class="mermaid">
+flowchart TD
+  gen["synthdata generate<br/>seed 42"] --> corpus["278 files generated"]
+  gen --> qa["216 golden questions<br/>30 in the smoke set"]
+  corpus --> ingest["gg-ingest: 276 indexed,<br/>then derive"]
+  ingest --> stores[("Qdrant, Neo4j<br/>and Postgres")]
+  qa --> select{"document<br/>evidence?"}
+  select -->|"no: 9"| skipped["listed in<br/>retrieval.skipped"]
+  select -->|"yes: 207"| scored["207 scored questions"]
+  scored --> retr["Retrieval eval<br/>top 10 doc keys"]
+  scored --> ans["Answer eval<br/>route, retrieve,<br/>generate, verify"]
+  scored --> noise["Noise eval<br/>rerank with<br/>5 distractors"]
+  qa -->|"all 216"| route["Routing eval<br/>regex layer and<br/>default route"]
+  stores --> retr
+  stores --> ans
+  stores --> noise
+  retr --> gates{"7 metric gates<br/>non-leakage<br/>5 coverage floors"}
+  ans --> gates
+  noise --> gates
+  route --> gates
+  gates -->|"failures empty"| pass(["run passes"])
+  gates -->|"any failure"| fail(["run fails,<br/>reasons listed"])
+      </pre>
+      <p><code>gg-eval battery</code> builds the same dependency stack as the API, forces external tools (openFDA, eCFR and the others) offline, and runs four evals over one QA file. The retrieval, answer and noise evals use only questions whose evidence includes a retrievable document key. The others are skipped and listed with a reason, so a skipped question cannot raise a score. The routing eval uses every question, because count questions answered from the warehouse are the ones routing has to get right.</p>
+      <p>CI runs the battery on the 30-question smoke set in the integration job for each push and pull request. A scheduled nightly workflow rebuilds the corpus from the seed, ingests, derives and runs the battery on the full golden set. It writes the JSONL history and the trend dashboard before the gate decision, so a failing night still appears in the trend.</p>
+      <aside class="note">
+        <p>Stack and offline rule: <code>packages/evals/src/gg_evals/battery.py</code> lines 1 to 9 and 127; the four evals at lines 153 to 157; gate decision at lines 163 to 165.</p>
+        <p>Skip rule: <code>retrieval_eval.py</code> lines 164 to 199. Routing over all items: <code>routing_eval.py</code> lines 96 to 98.</p>
+        <p>Counts in the diagram: <code>docs/results/run-seed42.txt</code> lines 7 and 10; <code>eval-battery-seed42.json</code> lines 3, 4 and 88.</p>
+        <p>Smoke in CI: <code>.github/workflows/ci.yml</code> line 59 runs <code>tests/integration/test_eval_battery.py</code>, whose test at line 16 asserts that the smoke battery passes. Nightly: <code>.github/workflows/nightly-eval.yml</code> lines 10 and 36 to 41; ADR 0019 lines 44 to 47.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>What each metric computes</h2>
+      <p>ADR 0013 replaced the ranx library with local code for recall@k, MRR and nDCG@k. ranx depends on numba, and its install was fragile on Python 3.13; unit tests against hand-computed values fix the formulas so a refactor cannot change what a gate means. The answer, routing and noise metrics are local code as well. <code>known-limitations.md</code> records that DeepEval and RAGAS are absent and that the choice is to be revisited if a regulator or downstream consumer requires a named, externally recognized framework.</p>
+      <div class="table-wrap wide"><table>
+        <thead>
+          <tr><th>Metric</th><th>Per-question computation</th><th>Averaged over</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Recall@10</td><td>Distinct doc keys among the top 10 retrieved chunks that are golden evidence, divided by the number of golden evidence documents. A repeated doc key counts once.</td><td>Scored questions (207)</td></tr>
+          <tr><td>MRR@10, nDCG@10</td><td>Reciprocal rank of the first relevant document; discounted gain against the ideal ranking. Reported without a gate.</td><td>Scored questions</td></tr>
+          <tr><td>Grounded answer rate</td><td>1 if the agent's verifier returns the verdict <code>grounded</code>, otherwise 0.</td><td>Scored questions</td></tr>
+          <tr><td>Citation precision</td><td>Cited doc keys that are golden evidence, at the expected revision when the question records one, divided by cited doc keys.</td><td>Grounded answers</td></tr>
+          <tr><td>Citation recall</td><td>The same hits divided by the number of golden evidence documents.</td><td>Grounded answers</td></tr>
+          <tr><td>Sentence support</td><td>For each sentence with at least 4 distinct content tokens: the share of its tokens found in the source its <code>[n]</code> marker cites, or in the whole evidence window when it has no marker. The share is multiplied by 0.2 when the sentence states a number the source lacks, and by 0.2 when its negation differs from a source that covers 60% or more of it. Mean over sentences.</td><td>Grounded answers</td></tr>
+          <tr><td>Routing accuracy</td><td>1 if the regex router's choice, or the default route <code>record</code> when no regex matches, is in the question's acceptable routes as emitted by the generator.</td><td>All questions (216)</td></tr>
+          <tr><td>Noise degradation</td><td>Recall of the clean top 10 minus recall after the reranker reorders the clean candidates plus 5 chunks retrieved for other questions. Distractor intrusion, the share of the reranked top 10 taken by distractors, is reported without a gate.</td><td>Questions that received distractors</td></tr>
+          <tr><td>Non-leakage</td><td>Any document, or document at a given revision, that the question lists as must-exclude and that appears in the retrieved chunks.</td><td>Scored questions</td></tr>
+        </tbody>
+      </table></div>
+      <p>Two rules in the table stop a metric from passing for the wrong reason. Citation and support scores average over grounded answers only, because an insufficient-evidence verdict has no citations to score and is already counted once through the grounded rate. Support scores each sentence against the source its own marker cites. A correct sentence attached to the wrong document therefore scores low even when the right document is elsewhere in the evidence window, and a unit test asserts this case.</p>
+      <aside class="note">
+        <p>ADR 0013: <code>docs/adr/0013-hand-rolled-eval-metrics.md</code> lines 6 to 9 and 22 to 23. Frameworks: <code>docs/validation/known-limitations.md</code> lines 49 to 61.</p>
+        <p>Rank metrics: <code>packages/evals/src/gg_evals/metrics.py</code> lines 11 to 49; K = 10 at <code>retrieval_eval.py</code> line 67.</p>
+        <p>Grounded and citation scores: <code>answer_eval.py</code> lines 38 to 54, 74 to 76, 87 to 131. Grounded-only averaging rationale: lines 8 and 9.</p>
+        <p>Support: <code>entailment.py</code> lines 37 to 47, 58 to 75 and 107 to 123. Wrong-source test: <code>packages/evals/tests/test_entailment.py</code> line 104.</p>
+        <p>Routing: <code>routing_eval.py</code> lines 48, 49 and 84 to 110; default route <code>record</code> at <code>packages/agents/src/gg_agents/state.py</code> line 29.</p>
+        <p>Noise: <code>noise.py</code> lines 25, 58 to 66 and 83 to 150. Non-leakage: <code>retrieval_eval.py</code> lines 213 to 234.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>How the gates were set</h2>
+      <p>The gate values below are the defaults of <code>BatteryThresholds</code> in the code. The rationale column quotes the repository. ADR 0019 states that its gates were locked after a calibration run on the full golden set and gives the calibration figures; it does not give the revision or seed of that run.</p>
+      <div class="table-wrap wide"><table>
+        <thead>
+          <tr><th>Gate</th><th class="num">Value in code</th><th>Rationale recorded in the repository</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Recall@10</td><td class="num">at least 0.80</td><td>Calibration measured 0.950. ADR 0012 records that the smoke recall gate holds with fake embeddings because the BM25 path is the same in CI and production.</td></tr>
+          <tr><td>Grounded answer rate</td><td class="num">at least 0.80</td><td>Calibration measured 1.000.</td></tr>
+          <tr><td>Sentence support</td><td class="num">at least 0.50</td><td>ADR 0019 sets this gate at 0.5 in place of 0.8 because a paraphrasing generator scores lower than it deserves on a lexical metric. Calibration measured 0.830.</td></tr>
+          <tr><td>Citation precision, citation recall</td><td class="num">at least 0.50 each</td><td>Code comment: provisional floors, set below expected performance so an ordinary run passes, to be tightened once the nightly run establishes a baseline.</td></tr>
+          <tr><td>Routing accuracy</td><td class="num">at least 0.90</td><td>Under fake providers the regex layer is the runtime router. Acceptable route sets were widened only where the target tool answers the question. Calibration measured 1.000.</td></tr>
+          <tr><td>Noise degradation</td><td class="num">at most 0.15</td><td>Calibration measured 0.000.</td></tr>
+          <tr><td>Non-leakage</td><td class="num">no leaks</td><td>A scoped question that surfaces an excluded document or revision fails the run regardless of every score.</td></tr>
+        </tbody>
+      </table></div>
+      <p>The coverage floors guard the denominators. Each metric gate averages over the questions that survive selection, so a QA set that lost questions would leave every gate green. For the full golden set the floors are at least 200 questions, at least 180 scored for retrieval, a skip rate of at most 8%, at least 5 questions per pattern and at least 150 questions tested against distractors. An optional fingerprint pin on the QA structure is not set.</p>
+      <aside class="note">
+        <p>Gate values: <code>BatteryThresholds</code>, <code>packages/evals/src/gg_evals/battery.py</code> lines 38 to 49; comparisons at lines 84 to 98; non-leakage at lines 99 to 102.</p>
+        <p>Calibration figures and rationale: <code>docs/adr/0019-eval-battery-lexical-gates.md</code> lines 20 to 33 and 38 to 41. ADR 0012 lines 38 and 39.</p>
+        <p>Coverage floors: <code>invariants.py</code> lines 1 to 8 and 32 to 38; fingerprint field at line 26, unset in <code>FULL_INVARIANTS</code>.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Seed-42 results against the gates</h2>
+      <p>One run is recorded. On 2026-10-28 at revision <code>055e6fe</code> the generator built the seed-42 corpus, ingestion indexed 276 files, derive produced 533 graph nodes, 1,328 edges and 357 register rows, and the battery ran with fake LLM, embedding, reranker and OCR providers and external tools offline. The report's <code>failures</code> list is empty and the console ends with <code>all gates passed</code>. The gates have different values, so each chart holds the metrics that share one gate.</p>
+      <figure class="chart" data-chart="gates-80"></figure>
+      <figure class="chart" data-chart="gates-90"></figure>
+      <figure class="chart" data-chart="gates-50"></figure>
+      <div class="table-wrap"><table>
+        <thead>
+          <tr><th>Check</th><th class="num">Seed-42 value</th><th class="num">Gate or floor</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Noise degradation</td><td class="num">0.000</td><td class="num">at most 0.15</td></tr>
+          <tr><td>Distractor intrusion</td><td class="num">0.0043</td><td class="num">none</td></tr>
+          <tr><td>Non-leakage violations</td><td class="num">0</td><td class="num">0</td></tr>
+          <tr><td>Questions in the set</td><td class="num">216</td><td class="num">at least 200</td></tr>
+          <tr><td>Questions scored for retrieval</td><td class="num">207</td><td class="num">at least 180</td></tr>
+          <tr><td>Skip rate</td><td class="num">4.2% (9 of 216)</td><td class="num">at most 8%</td></tr>
+          <tr><td>Questions tested against distractors</td><td class="num">207</td><td class="num">at least 150</td></tr>
+          <tr><td>MRR@10</td><td class="num">0.8992</td><td class="num">none</td></tr>
+          <tr><td>nDCG@10</td><td class="num">0.9000</td><td class="num">none</td></tr>
+        </tbody>
+      </table></div>
+      <p>The 4 misroutes, QA-0206 to QA-0209, are governance and clinical questions that ask for a CAPA count within a management review period. The count phrasing sends them to the aggregate tool, and the routing table excludes aggregate for this pattern because the answer must come from the review record. A comment in the routing eval states that the gate is not relaxed to hide this misroute. By computation from the gate, the 90% floor would still pass with up to 21 misroutes out of 216.</p>
+      <p>No per-pattern recall gate exists. Supplier questions reach 14.3% recall@10 over 7 questions and seeded defect discovery 71.4% over 7, while the 80% gate applies to the mean over 207. The project page plots recall by pattern.</p>
+      <p>The offline test suite at <code>3654d96</code> reported 884 passed, 33 deselected and 1 expected failure. The deselected tests carry the integration or external markers. The expected failure is the strict xfail described under the limits below.</p>
+      <aside class="note">
+        <p>Run: <code>docs/results/run-seed42.txt</code> lines 1 to 2, 7, 10, 13, 19 and 31. Report: <code>docs/results/eval-battery-seed42.json</code>; gated values at lines 5, 81 to 84 and 89; noise at lines 113 to 120; leaks line 65; failures line 121; MRR and nDCG lines 6 and 7; skips lines 66 to 76.</p>
+        <p>Skip rate 9 / 216 = 0.0417 and routing 212 / 216 = 0.9815, computed. 21 misroutes give 195 / 216 = 0.903; 22 give 0.898.</p>
+        <p>Misroutes: report lines 90 to 111. Routing table and comment: <code>routing_eval.py</code> lines 38 to 44.</p>
+        <p>Per pattern: report lines 49 to 53 and 19 to 23.</p>
+        <p>Tests: <code>.venv/bin/python -m pytest -q -p no:cacheprovider</code> at <code>3654d96</code>, 64 s. Markers deselected by <code>addopts</code> in <code>pyproject.toml</code> line 65.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>What the fake generator means for the grounded number</h2>
+      <p>With no LLM key the generate node does not call a model. It returns a header line and, for at most 2 internal evidence parents, the citation label and the first 240 characters of the parent's text followed by a <code>[n]</code> marker. A tool result is returned whole with <code>[1]</code>. The verifier then checks that the answer carries at least one marker that points at an evidence parent. It does not judge entailment: it records <code>fake llm: entailment not evaluated</code> and returns <code>grounded</code>.</p>
+      <p>A grounded rate of 100% under these conditions shows that each of the 207 scored questions reached at least one evidence parent with a usable revision and that the answer carried a resolvable citation. It does not measure whether a hosted model's answers are supported by their sources. <code>docs/results/</code> holds only the fake-provider run.</p>
+      <p>The fake also shapes the other answer metrics. The following points are inferences from the code, not separate measurements:</p>
+      <ul>
+        <li>Because the fake cites at most 2 internal parents, citation precision measures whether the top 2 parents in the generation window are golden evidence, and citation recall cannot reach 1.0 for a question with more than 2 evidence documents.</li>
+        <li>The fake quotes source text, so its sentences contain no invented content. The 58.9% support score then comes from the text around and inside the quotes: the header line, the citation labels, the 240-character clips and sentence fragments scored against one cited source. The report has no per-answer breakdown that would confirm this.</li>
+        <li>Dense vectors under fakes are SHA-256 pseudo-vectors and the fake reranker scores IDF-weighted token overlap. Recall@10 of 94.4% therefore measures the BM25 branch and a lexical reranker, and the noise result measures the lexical stand-in in place of a cross-encoder.</li>
+      </ul>
+      <aside class="note">
+        <p>Fake generation: <code>packages/agents/src/gg_agents/nodes.py</code> lines 381 to 382 and 389 to 406; 240-character clip at lines 159 to 161; window of 6 parents at line 44 and lines 179 to 185.</p>
+        <p>Verifier: <code>nodes.py</code> lines 409 to 431 and 448 to 458.</p>
+        <p>Fakes: <code>packages/common/src/gg_common/providers/fakes.py</code> lines 23 to 33 (SHA-256 vectors) and 82 to 111 (reranker). README lines 141 to 144 and 297 to 299.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>ADRs that cite or depend on the measurement</h2>
+      <div class="table-wrap wide"><table>
+        <thead>
+          <tr><th>ADR</th><th>Decision</th><th>Relation to the eval, as the repository records it</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>0009</td><td>Hosted providers behind interfaces, each with a deterministic fake</td><td>The battery runs without keys because every provider has a fake. <code>ProviderSet.using_fakes</code> is logged so a fake cannot pass as a real provider; the seed-42 run log lists fakes for llm, embeddings, rerank and ocr.</td></tr>
+          <tr><td>0012</td><td>Local BM25 sparse vectors in place of a learned sparse model</td><td>Listed under consequences: the fake-provider CI path runs the production sparse pipeline, which is why the smoke recall gate holds with fake embeddings. A provenance test pins the <code>avgdl</code> constant to the seeded corpus. The stated reasons for the choice are inference cost and identifier-heavy QMS text.</td></tr>
+          <tr><td>0013</td><td>Hand-rolled recall, MRR and nDCG in place of ranx</td><td>Defines the rank metrics and their unit tests. Gives up ranx's significance testing until tuning needs paired tests.</td></tr>
+          <tr><td>0016</td><td>Deterministic regex routing ahead of the LLM router</td><td>The routing eval scores this layer. The ADR records that golden count, trace and defect-discovery questions are answered the same way with or without keys, and that the regexes are pinned to golden QA phrasings by unit tests.</td></tr>
+          <tr><td>0019</td><td>One nightly battery with a lexical support metric and calibrated gates</td><td>Defines the four evals, replaces an LLM judge with lexical support for determinism and cost, and sets the gate values after a calibration run. Its text differs from the code in four places, listed under the limits below.</td></tr>
+          <tr><td>0020</td><td>Cloud Terraform skeletons without a deployment</td><td>The planned acceptance step was a cloud deploy with the eval smoke green. The ADR records that the deploy and the cloud-side eval smoke were not performed.</td></tr>
+        </tbody>
+      </table></div>
+      <p>Inference: ADR 0019 is the only one of these whose decision text cites measured values, the calibration figures. ADRs 0012 and 0016 refer to the golden set and the recall gate under their consequences. The repository does not record a decision that an eval result reversed.</p>
+      <aside class="note">
+        <p>ADR 0009 lines 13 to 18; run log line 13. ADR 0012 lines 6 to 11, 29 to 34 and 38 to 39. ADR 0013 lines 11 to 23. ADR 0016 lines 13 to 19 and 29 to 34. ADR 0019 lines 14 to 47. ADR 0020 lines 6 to 8 and 24 to 25.</p>
+        <p>Routing eval and ADR 0016: <code>routing_eval.py</code> lines 1 to 8.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Limits of this result</h2>
+      <ul>
+        <li><strong>Synthetic corpus.</strong> The generator that writes the documents also writes the golden questions. The README states that results do not transfer to a real QMS without a new golden set. Inference: questions and documents from one generator share identifiers and phrasing, which favours the lexical retrieval path measured here.</li>
+        <li><strong>Fake providers.</strong> A hosted LLM's answers, the LLM router, dense retrieval and a cross-encoder reranker are not measured. The routing eval scores the regex layer and the default route even when keys are present.</li>
+        <li><strong>One seed, one run.</strong> No variance across seeds or reruns is recorded, and ADR 0013 gives up significance testing. The nightly trend history is best effort: the traceability matrix notes that concurrent runs can fork it and cache eviction resets it.</li>
+        <li><strong>Lexical support.</strong> Sentence support measures token overlap with the cited source. A strict xfail test records that it cannot detect an actor swap, where the approver and the approved plan exchange places in the same sentence.</li>
+        <li><strong>No per-pattern gate.</strong> Supplier recall is 14.3% over 7 questions while the mean passes.</li>
+        <li><strong>Recorded discrepancy between ADR 0019 and the code.</strong> This article uses the code values.
+          <ul>
+            <li>ADR 0019 says citation precision is tracked and not gated. <code>BatteryThresholds</code> gates citation precision and citation recall at 0.5 each. Requirement R-01 in the traceability matrix agrees with the code.</li>
+            <li>ADR 0019 says the noise gate is on nDCG degradation. The code gates mean recall degradation. Requirement R-05 in the traceability matrix agrees with the code.</li>
+            <li>ADR 0019 describes support as the best coverage in any evidence text. The answer eval scores each sentence against the source it cites.</li>
+            <li>ADR 0019 lists 5 gates. The code applies 7 metric gates, the non-leakage check and the coverage floors.</li>
+          </ul>
+          The ADR's calibration figures for support (0.830) and routing (1.000) also differ from the seed-42 values (0.589 and 0.981). The repository does not record when the calibration ran or what changed after it.</li>
+        <li><strong>Scope.</strong> The system is read-only decision support. Its answers point to controlled documents and do not replace them, and the eval does not test the user's verification step.</li>
+      </ul>
+      <aside class="note">
+        <p>Synthetic corpus: <code>README.md</code> lines 300 to 301. Fakes and routing: README lines 285 to 287; <code>routing_eval.py</code> lines 4 to 8 and 48 to 49.</p>
+        <p>Trend history: <code>docs/validation/requirements-traceability.md</code> lines 65 to 72. Actor swap: <code>packages/evals/tests/test_entailment.py</code> lines 88 to 98.</p>
+        <p>ADR 0019 lines 22 to 24, 35, 38 to 41. Code: <code>battery.py</code> lines 46 to 47 and 84 to 102; <code>noise.py</code> lines 58 to 62; <code>answer_eval.py</code> line 131; <code>invariants.py</code> lines 32 to 38. Traceability R-01 line 23, R-05 line 27.</p>
+        <p>Scope: <code>docs/validation/intended-use.md</code> lines 36 to 48 and 50 to 55.</p>
+      </aside>
+    </section>
+  </main>
+
+  <footer>
+    Text and figures CC BY 4.0. Figures generated from <code>data.json</code> in this directory.
+  </footer>
+
+  <script src="../../assets/charts.js" defer></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+    const dark = document.documentElement.dataset.theme === "dark" ||
+      (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+    mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral",
+      fontFamily: "IBM Plex Sans, system-ui, sans-serif", securityLevel: "strict" });
+  </script>
+</body>
+</html>

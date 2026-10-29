@@ -1,0 +1,24 @@
+{
+  "meta": {"article": "wsl-disk-compaction", "revision": "notes revised 2026-09-11", "measured": "2026-09-10 and 2026-09-11"},
+  "charts": [
+    {"name": "guest-sizes", "type": "stats", "title": "Sizes the notes record inside the guest",
+     "subtitle": "Guest-side measurements only; the notes contain no measured size of ext4.vhdx",
+     "source": "author's investigation notes, revision 2026-09-11, section 2",
+     "tiles": [
+       {"label": "Live data in the guest ext4 filesystem", "value": "140 GiB", "note": "df on /, 2026-09-11"},
+       {"label": "Freed inside the guest", "value": "59.7 GiB", "note": "2026-09-10; none returned to the Windows drive"},
+       {"label": "ext4 virtual capacity", "value": "1007 GiB", "note": "only the allocated part occupies host disk"}
+     ]},
+    {"name": "guest-cleanup", "type": "hbar", "title": "Space freed inside the guest on 2026-09-10, by category (GB)",
+     "subtitle": "The four categories the notes size individually. They sum to 48.0 GB; the notes give the total as 59.7 GiB and do not size the remaining caches.",
+     "source": "author's investigation notes, revision 2026-09-11, section 2",
+     "alt": "Unused Docker images 17.3 GB, Docker build cache 16.8 GB, npm cache 8.7 GB, uv cache 5.2 GB.",
+     "format": "number",
+     "data": [
+       {"label": "Unused Docker images (123)", "value": 17.3},
+       {"label": "Docker build cache", "value": 16.8},
+       {"label": "npm _cacache and _npx", "value": 8.7},
+       {"label": "uv cache", "value": 5.2}
+     ]}
+  ]
+}

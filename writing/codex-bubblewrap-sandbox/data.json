@@ -1,0 +1,20 @@
+{
+  "meta": {"article": "codex-bubblewrap-sandbox", "revision": "agent-controls fb209b2", "measured": "2026-10-28"},
+  "charts": [
+    {"name": "sandbox-tests-by-area", "type": "hbar", "title": "Test cases for codex-sandbox, by area",
+     "subtitle": "26 cases collected from tests/test_codex_sandbox.py: 21 dry-run argument checks and 5 runs inside a real namespace. Areas assigned by the author; each case is in one area.",
+     "source": "uvx pytest --collect-only -q at agent-controls fb209b2",
+     "alt": "Root selection and binding 6 cases, config errors 5, subtree roots 4, secret file masking 3, empty HOME and /tmp with WSL routes 3, startup refusals 2, Codex binary lookup and bypass 2, state, tool and environment lines 1.",
+     "format": "number",
+     "data": [
+       {"label": "Root selection and binding", "value": 6, "note": "3 argument checks, 3 namespace runs"},
+       {"label": "Config errors", "value": 5, "note": "5 argument checks"},
+       {"label": "Subtree roots", "value": 4, "note": "4 argument checks"},
+       {"label": "Secret file masking", "value": 3, "note": "2 argument checks, 1 namespace run"},
+       {"label": "Empty HOME and /tmp, WSL routes", "value": 3, "note": "2 argument checks, 1 namespace run"},
+       {"label": "Startup refusals", "value": 2, "note": "2 argument checks"},
+       {"label": "Codex binary lookup and bypass", "value": 2, "note": "2 argument checks"},
+       {"label": "State, tool and environment lines", "value": 1, "note": "1 argument check"}
+     ]}
+  ]
+}

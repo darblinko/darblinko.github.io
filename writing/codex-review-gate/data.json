@@ -1,0 +1,166 @@
+{
+  "meta": {
+    "repo": "darblinko.github.io",
+    "revision": "agent-controls fb209b2",
+    "measured": "2026-10-28"
+  },
+  "charts": [
+    {
+      "name": "gate-figures",
+      "type": "stats",
+      "title": "The review gate in four numbers",
+      "subtitle": "Defaults and test count at agent-controls fb209b2; verdicts from the original gate's logs",
+      "source": "hooks/codex-review-gate.sh lines 60 and 61; uvx pytest --collect-only -q; activity logs of the original gate in two private repositories",
+      "alt": "The gate allows 2 review rounds per batch and a 204,800 byte prompt, has 28 tests, and its original version logged 34 verdicts in two private repositories.",
+      "tiles": [
+        {
+          "label": "Review rounds per batch",
+          "value": "2",
+          "note": "default, gate script line 60"
+        },
+        {
+          "label": "Prompt cap, bytes",
+          "value": "204,800",
+          "note": "default, gate script line 61"
+        },
+        {
+          "label": "Gate tests",
+          "value": "28",
+          "note": "all passing at fb209b2"
+        },
+        {
+          "label": "Logged verdicts",
+          "value": "34",
+          "note": "original gate, 2026-04-29 to 2026-05-10"
+        }
+      ]
+    },
+    {
+      "name": "tests-by-area",
+      "type": "hbar",
+      "title": "Review gate tests by area",
+      "subtitle": "28 collected tests in tests/test_review_gate.py, grouped by the behavior each test name states",
+      "source": "uvx pytest --collect-only -q at agent-controls fb209b2",
+      "alt": "Reviewer failures and blocking with the round cap have 5 tests each; pass-through, approval binding and locking have 3 each; test command, prompt construction, setup errors and the verdict helper have 2 each; dispute logging has 1.",
+      "format": "number",
+      "data": [
+        {
+          "label": "reviewer failures",
+          "value": 5,
+          "note": "exit 1, no approval, no round used"
+        },
+        {
+          "label": "blocking, round cap, batch reset",
+          "value": 5
+        },
+        {
+          "label": "pass-through without review",
+          "value": 3,
+          "note": "clean tree, disabled by variable or marker"
+        },
+        {
+          "label": "approval bound to working state",
+          "value": 3
+        },
+        {
+          "label": "locking",
+          "value": 3,
+          "note": "live lock, dead process, age after the hook timeout"
+        },
+        {
+          "label": "test command",
+          "value": 2
+        },
+        {
+          "label": "prompt construction",
+          "value": 2,
+          "note": "prompt cap, binary files"
+        },
+        {
+          "label": "setup errors",
+          "value": 2
+        },
+        {
+          "label": "verdict helper",
+          "value": 2
+        },
+        {
+          "label": "dispute logging",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "verdicts-by-round",
+      "type": "columns",
+      "title": "Verdicts logged by the original gate, by round",
+      "subtitle": "34 verdict events in the activity logs of two private repositories",
+      "source": "qa_activity.log in two private repositories: round and event fields of verdict lines, counted",
+      "alt": "Round 1 has 2 approvals, 12 change requests and 1 dispute; round 2 has 8 approvals, 2 change requests and 3 approvals at the cap; rounds 3 to 7 have 2 approvals and 4 change requests.",
+      "format": "number",
+      "max": 15,
+      "categories": [
+        "Round 1",
+        "Round 2",
+        "Rounds 3 to 7"
+      ],
+      "series": [
+        {
+          "name": "Approved",
+          "values": [
+            2,
+            8,
+            2
+          ]
+        },
+        {
+          "name": "Changes requested",
+          "values": [
+            12,
+            2,
+            4
+          ]
+        },
+        {
+          "name": "Approved at the round cap",
+          "values": [
+            0,
+            3,
+            0
+          ]
+        },
+        {
+          "name": "Disputed",
+          "values": [
+            1,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "codex-calls",
+      "type": "hbar",
+      "title": "Codex review calls by result",
+      "subtitle": "39 calls logged by the original gate in two private repositories",
+      "source": "qa_activity.log in two private repositories: CODEX_INVOKE, CODEX_COMPLETE and CODEX_ERROR events, counted",
+      "alt": "33 of 39 Codex calls completed with a review, 3 exited with an error and 3 have no completion or error line.",
+      "format": "number",
+      "data": [
+        {
+          "label": "completed with a review",
+          "value": 33
+        },
+        {
+          "label": "exited with an error",
+          "value": 3
+        },
+        {
+          "label": "no completion or error logged",
+          "value": 3
+        }
+      ]
+    }
+  ]
+}

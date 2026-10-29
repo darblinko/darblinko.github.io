@@ -1,0 +1,54 @@
+{
+  "meta": {
+    "repo": "golden-goose",
+    "revision": "3654d96",
+    "measured": "2026-10-28"
+  },
+  "charts": [
+    {
+      "name": "gates-80",
+      "type": "hbar",
+      "title": "Recall@10 and grounded answer rate against the 80% gate",
+      "subtitle": "Seed-42 run at 055e6fe, 207 scored questions. Grounded rate measured with the fake extractive generator, not a hosted model",
+      "source": "docs/results/eval-battery-seed42.json lines 5 and 81; gate from BatteryThresholds, packages/evals/src/gg_evals/battery.py lines 39 and 40",
+      "alt": "Recall at 10 is 94.4 percent and grounded answer rate is 100 percent, both above the 80 percent gate. The grounded rate was measured with a fake extractive generator.",
+      "format": "percent",
+      "max": 1,
+      "threshold": {"value": 0.8, "label": "gate 80%"},
+      "data": [
+        {"label": "Recall@10", "value": 0.9444, "status": "pass", "note": "mean over 207 questions"},
+        {"label": "Grounded answer rate", "value": 1.0, "status": "pass", "note": "fake extractive generator, not a hosted model"}
+      ]
+    },
+    {
+      "name": "gates-90",
+      "type": "hbar",
+      "title": "Routing accuracy against the 90% gate",
+      "subtitle": "Seed-42 run at 055e6fe, all 216 questions, deterministic regex layer and default route",
+      "source": "docs/results/eval-battery-seed42.json lines 88 to 111 (212 of 216); gate from BatteryThresholds, battery.py line 48",
+      "alt": "Routing accuracy is 98.1 percent, 212 of 216 questions, above the 90 percent gate.",
+      "format": "percent",
+      "max": 1,
+      "threshold": {"value": 0.9, "label": "gate 90%"},
+      "data": [
+        {"label": "Routing accuracy", "value": 0.981481, "status": "pass", "note": "212 of 216; 4 misroutes"}
+      ]
+    },
+    {
+      "name": "gates-50",
+      "type": "hbar",
+      "title": "Citation recall, citation precision and sentence support against the 50% gates",
+      "subtitle": "Seed-42 run at 055e6fe, means over 207 grounded answers from the fake extractive generator",
+      "source": "docs/results/eval-battery-seed42.json lines 82 to 84; gates from BatteryThresholds, battery.py lines 41, 46 and 47",
+      "alt": "Citation recall is 83.3 percent, citation precision 70.5 percent and sentence support 58.9 percent, all above their 50 percent gates. Answers came from a fake extractive generator.",
+      "format": "percent",
+      "max": 1,
+      "threshold": {"value": 0.5, "label": "gate 50%"},
+      "data": [
+        {"label": "Citation recall", "value": 0.8333, "status": "pass", "note": "fake generator cites at most 2 parents"},
+        {"label": "Citation precision", "value": 0.7045, "status": "pass", "note": "provisional floor in code"},
+        {"label": "Sentence support", "value": 0.5894, "status": "pass", "note": "lexical token coverage"}
+      ]
+    }
+  ]
+}

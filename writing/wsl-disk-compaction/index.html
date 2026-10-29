@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Why trimming does not shrink a WSL disk</title>
+  <meta name="description" content="Discards issued by ext4 inside WSL2 stop at a dynamically expanding VHDX with sparse mode off, so the host file keeps its size until it is compacted offline with the VM stopped.">
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../assets/site.css">
+  <link rel="stylesheet" href="../../assets/pages.css">
+</head>
+<body>
+  <header class="site-bar">
+    <a href="../../">Mitchell Foutz</a>
+    <a href="../../#writing">All writing</a>
+  </header>
+
+  <main class="article">
+    <section class="intro">
+      <h1>Why trimming does not shrink a WSL disk</h1>
+      <p class="lede">I freed 59.7 GiB inside a WSL2 distro and running <code>fstrim</code> in the guest did not shrink the host file. The guest's discards stop at ext4.vhdx, a dynamically expanding virtual disk with sparse mode off; the space returns to Windows only through offline compaction of that file with the WSL VM fully stopped.</p>
+      <dl class="record">
+        <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
+        <div><dt>Topic</dt><dd>Tooling</dd></div>
+        <div><dt>Environment</dt><dd>WSL2, WSL 2.7.10.0, guest kernel 6.18.33.2-2</dd></div>
+        <div><dt>Measured</dt><dd>2026-09-10 and 2026-09-11</dd></div>
+      </dl>
+    </section>
+
+    <section>
+      <h2>Symptom: 59.7 GiB freed in the guest, none returned to the host</h2>
+      <p>On 2026-09-10 I removed 59.7 GiB of data inside an Ubuntu distro running under WSL2: the Docker build cache, 123 unused Docker images, the npm and uv caches, and the caches of vscode-cpptools, Playwright, huggingface, Puppeteer, the AWS CLI, pip and VS Code extension packages. My notes from the next day record that none of that space had returned to the Windows drive.</p>
+      <p>The guest filesystem held 135.3 GiB of live data on 2026-09-10 and 140 GiB on 2026-09-11, inside an ext4 virtual capacity of 1007 GiB. The host file, ext4.vhdx, was estimated at about 250 GB. The notes mark that estimate as unverified.</p>
+      <p>The notes stop before the compaction ran. They contain no measured size of ext4.vhdx before or after, so the charts below show guest-side measurements only, and the expected reduction later in this article is an estimate.</p>
+      <figure class="chart" data-chart="guest-sizes"></figure>
+      <figure class="chart" data-chart="guest-cleanup"></figure>
+      <aside class="note">
+        <p>Source for every figure in this section: my investigation notes, revision 2026-09-11, section 2 ("Current state").</p>
+        <p>140 GiB: <code>df</code> on <code>/</code>, 2026-09-11. 135.3 GiB: the 2026-09-10 measurement. 1007 GiB: ext4 virtual capacity. About 250 GB: host file size, marked unverified.</p>
+        <p>59.7 GiB freed on 2026-09-10, with 17.3 GB of images (123), 16.8 GB of build cache, 8.7 GB of npm cache and 5.2 GB of uv cache. 48.0 GB is the sum of those four, computed here.</p>
+        <p>The notes give <code>df</code> figures in GiB and tool-reported figures in GB. This article keeps each unit as recorded and converts neither.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Why the virtual disk keeps its size</h2>
+      <p>A deleted file passes through three layers on its way to the Windows drive. The discards stop at the third.</p>
+      <pre class="mermaid" role="img" aria-label="A file deleted in the guest causes ext4, mounted with discard, to send TRIM or UNMAP requests to the virtual disk of the WSL2 VM. The virtual disk is ext4.vhdx on NTFS, dynamically expanding with sparse mode off, so the discarded blocks stay allocated and the host file size does not change. Offline compaction with diskpart or Optimize-VHD, run with the VM stopped and an exclusive handle, is the path that shrinks the file.">
+flowchart TB
+  del["File deleted in the guest"] --> fs["ext4 on /, mounted with discard"]
+  fs -->|"TRIM or UNMAP, also from fstrim"| dev["Virtual disk of the WSL2 VM"]
+  dev --> vhdx["ext4.vhdx: dynamically expanding, sparse off"]
+  vhdx -.->|"discarded blocks stay allocated"| host["Host file size unchanged"]
+  compact["diskpart or Optimize-VHD, VM stopped"] -->|"exclusive handle"| vhdx
+</pre>
+      <ol>
+        <li><strong>ext4 in the guest.</strong> The root filesystem is mounted with <code>rw,relatime,discard,errors=remount-ro,data=ordered</code>. The <code>discard</code> option makes ext4 send TRIM or UNMAP requests to its block device as files are deleted. <code>fstrim -av</code> sends the same requests for free space on demand.</li>
+        <li><strong>The virtual disk.</strong> The WSL2 VM presents ext4.vhdx to the guest as a block device. The guest's discards arrive at this layer.</li>
+        <li><strong>ext4.vhdx on the host.</strong> The file is a dynamically expanding VHDX. It grows as the guest writes and does not shrink by itself. Sparse mode is off for this file, so the virtual disk layer does not punch holes in it when discards arrive. The discarded blocks stay allocated in the host file.</li>
+      </ol>
+      <p>The byte count that <code>fstrim -av</code> prints is the amount of discard the guest issued. The notes give "797 GiB trimmed" as an example of that output. Inference: a figure larger than both the 140 GiB of live data and the estimated 250 GB host file cannot describe a reduction in the host file.</p>
+      <p>With sparse mode off, the notes identify offline compaction as the in-place way to return the space: <code>diskpart</code> with <code>compact vdisk</code>, or the Hyper-V cmdlet <code>Optimize-VHD</code>. Compaction needs an exclusive handle on ext4.vhdx. A running WSL VM holds that handle, so the VM must be fully stopped and must stay stopped until compaction finishes.</p>
+      <aside class="note">
+        <p>Source: notes, section 3 ("Why trim doesn't trim"), points 1 to 6. Mount options: notes, section 2.</p>
+        <p>797 GiB is the example figure in section 3, point 3. 140 GiB and about 250 GB are from section 2.</p>
+        <p>The layer behavior is what the notes recorded on WSL 2.7.10.0. Other WSL versions were not tested.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Why the first attempt failed</h2>
+      <p>On 2026-09-10 I tried to turn sparse mode on with <code>wsl --manage &lt;distro&gt; --set-sparse true --allow-unsafe</code>. The command returned <code>WSL_E_DISTRO_NOT_STOPPED</code> on every attempt. After every <code>wsl --shutdown</code>, <code>vmmemWSL</code> and two <code>wslhost</code> processes in session 1 were still running.</p>
+      <p>The cause was a VS Code Remote-WSL window hosting a Claude Code session inside the distro. The notes record that the Remote-WSL server reconnected within milliseconds of each shutdown and re-attached the VHDX before the next command ran. The notes attribute two <code>wslhost</code> instances in session 1 to an interactive application. Docker Desktop, Task Scheduler, Microsoft Defender and startup tasks were ruled out.</p>
+      <p>The revised procedure leaves sparse mode off. The notes record that Microsoft disabled sparse VHD support by default after reports of data corruption, which is the reason the flag is named <code>--allow-unsafe</code>. Sparse mode would reclaim space automatically, at a nonzero risk of losing the whole filesystem. The notes schedule offline compaction instead: quarterly, or whenever the VHDX exceeds about 1.5 times the live data size.</p>
+      <aside class="note">
+        <p>Source: notes, section 3, "Why the 2026-09-10 attempt failed" and "Do not enable sparse mode".</p>
+        <p>"Two" <code>wslhost</code> processes, session 1, "within milliseconds", the quarterly interval and the 1.5 times ratio are all from that section.</p>
+        <p>The statement about Microsoft's default for sparse VHD support is as recorded in the notes. The notes cite no Microsoft document for it, and this article adds none.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Procedure</h2>
+      <p>The notes were written as a runbook for a coding agent in a Windows terminal, with me approving each UAC prompt. Each step has a success condition. When a condition is not met, the run stops and nothing later is attempted.</p>
+      <p>Paths are generic. <code>&lt;distro&gt;</code> is the WSL distro name, <code>&lt;distro package&gt;</code> is its package directory under <code>%LOCALAPPDATA%\Packages</code>, <code>&lt;container&gt;</code> is a running container, and the scripts live in <code>%USERPROFILE%\wsl-compact</code>. Each PowerShell script that reads <code>wsl.exe</code> output sets <code>$env:WSL_UTF8 = 1</code> first. Without it, <code>wsl.exe</code> emits UTF-16LE, which Windows PowerShell 5.1 renders with interleaved null bytes.</p>
+      <ol class="steps">
+        <li>
+          <p><strong>Close every path back into the distro.</strong> Close Remote-WSL windows; integrated terminals and Windows Terminal tabs that run a WSL shell; File Explorer windows on the distro's network share and any drive letter mapped to it; Docker Desktop; and IDEs with a WSL interpreter. In the VS Code window that stays open, set <code>terminal.<wbr>integrated.<wbr>defaultProfile.<wbr>windows</code> to PowerShell or Command Prompt, open a Windows folder, disable the <code>ms-vscode-remote.remote-wsl</code> extension and reload the window, and set <code>window.restoreWindows</code> to <code>none</code> for the duration. The notes rate disabling the extension as the most effective single control.</p>
+        </li>
+        <li>
+          <p><strong>Reclaim inside the guest and trim.</strong> The commands run as root through <code>wsl.exe -u root</code>, so no password prompt appears.</p>
+          <pre><code>wsl.exe -d &lt;distro&gt; -u root -- journalctl --vacuum-size=100M
+wsl.exe -d &lt;distro&gt; -u root -- apt-get clean
+wsl.exe -d &lt;distro&gt; -u root -- fstrim -av
+wsl.exe -d &lt;distro&gt; -u root -- df -h /</code></pre>
+          <p>The notes estimate that the journal vacuum frees about 0.46 GB of the 0.56 GB in <code>/var/log/journal</code>, and that <code>apt-get clean</code> frees about 0.33 GB. The <code>fstrim</code> count is informational. If <code>fstrim</code> fails, the run continues, because the <code>discard</code> mount option has already issued discards for the deleted files. Success: <code>df -h /</code> reports used space at or below the last recorded figure.</p>
+        </li>
+        <li>
+          <p><strong>Stop running containers.</strong> <code>wsl --shutdown</code> stops the VM abruptly. One Neo4j container was running. A 60 second timeout gives it time to checkpoint.</p>
+          <pre><code>wsl.exe -d &lt;distro&gt; -u root -- docker stop -t 60 &lt;container&gt;
+wsl.exe -d &lt;distro&gt; -u root -- docker ps</code></pre>
+          <p>Success: <code>docker ps</code> lists no running containers.</p>
+        </li>
+        <li>
+          <p><strong>Optional: exclude the distro directory from Microsoft Defender.</strong> Administrator. The notes' reasoning: Defender cannot read ext4 contents, and the block changes that compaction produces trigger a full rescan of a file estimated at about 250 GB.</p>
+          <pre><code>Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\Packages\&lt;distro package&gt;\LocalState"
+(Get-MpPreference).ExclusionPath</code></pre>
+        </li>
+        <li>
+          <p><strong>Shut down WSL and confirm it stayed down.</strong></p>
+          <pre><code>$env:WSL_UTF8 = 1
+wsl.exe --shutdown
+Start-Sleep -Seconds 15
+wsl.exe --list --running
+Get-Process -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -match '^(vmmemWSL|wslhost|vmwp)$' } |
+  Select-Object Name, Id, SessionId</code></pre>
+          <p>Success requires both parts: <code>--list --running</code> reports no running distributions, and no <code>vmmemWSL</code>, <code>wslhost</code> or <code>vmwp</code> process remains. <code>wslservice</code> running alone, with no VM, does not hold the file. If a <code>wslhost</code> remains, find the application that started it:</p>
+          <pre><code>Get-CimInstance Win32_Process -Filter "Name='wslhost.exe'" |
+  Select-Object ProcessId, ParentProcessId, CreationDate, CommandLine</code></pre>
+          <p>Resolve the parent with <code>Get-Process -Id &lt;ParentProcessId&gt;</code> and close it. If that finds nothing, <code>Restart-Service WSLService -Force</code> (administrator) takes the VM down. The notes record that <code>Stop-Process</code> on <code>vmmemWSL</code> returns access denied.</p>
+        </li>
+        <li>
+          <p><strong>Record the size before.</strong> No elevation needed.</p>
+          <pre><code>$vhdx = "$env:LOCALAPPDATA\Packages\&lt;distro package&gt;\LocalState\ext4.vhdx"
+Get-Item $vhdx | Select-Object Name, @{n='SizeGB';e={[math]::Round($_.Length/1GB,2)}}, LastWriteTime
+Get-PSDrive C | Select-Object @{n='FreeGB';e={[math]::Round($_.Free/1GB,2)}}</code></pre>
+        </li>
+        <li>
+          <p><strong>Compact.</strong> Administrator. The diskpart script, <code>compact.txt</code>, saved as ASCII:</p>
+          <pre><code>automount disable
+select vdisk file="&lt;full path to ext4.vhdx&gt;"
+attach vdisk readonly
+compact vdisk
+detach vdisk
+automount enable
+exit</code></pre>
+          <p>An elevated wrapper captures its own transcript, because the notes record that <code>Start-Process -Verb RunAs</code> cannot be combined with <code>-RedirectStandardOutput</code>:</p>
+          <pre><code>$work = "$env:USERPROFILE\wsl-compact"
+Start-Transcript -Path "$work\compact.log" -Force
+diskpart /s "$work\compact.txt"
+Write-Output "DISKPART_EXIT=$LASTEXITCODE"
+Stop-Transcript</code></pre>
+          <p>Per the notes, compacting without <code>attach vdisk readonly</code> fails or does less work, and read-only attachment keeps stray writes out of the ext4 image. <code>automount disable</code> suppresses the "You need to format the disk" dialog that Windows raises for a volume it cannot read; clicking Format there would destroy the distro. The notes expect several minutes to tens of minutes with no progress output, and set the tool timeout at 45 minutes or more. Success: <code>compact.log</code> contains "DiskPart successfully compacted the virtual disk file." and <code>DISKPART_EXIT=0</code>.</p>
+        </li>
+        <li>
+          <p><strong>Record the size after</strong> with the step 6 commands and compare. If the gain is under 10 GB, go to the fallbacks below. While WSL is still stopped, <code>swap.vhdx</code> in the same <code>LocalState</code> directory can be deleted; WSL recreates it at the next boot.</p>
+        </li>
+        <li>
+          <p><strong>Restart and verify.</strong></p>
+          <pre><code>wsl.exe -d &lt;distro&gt; -- bash -lc "df -h / &amp;&amp; echo FS_OK"
+wsl.exe -d &lt;distro&gt; -u root -- docker start &lt;container&gt;
+wsl.exe -d &lt;distro&gt; -u root -- docker logs --tail 30 &lt;container&gt;</code></pre>
+          <p>Success: <code>FS_OK</code> prints, used space matches step 2, and the container log shows a clean start. Then re-enable the WSL extension and restore <code>window.restoreWindows</code>.</p>
+        </li>
+      </ol>
+      <aside class="note">
+        <p>Source: notes, section 4 (step 1) and section 6, steps 6.3 to 6.10 (steps 2 to 9 here).</p>
+        <p>100M, 0.46 GB, 0.56 GB and 0.33 GB: step 6.3 and section 9. 60 second timeout: step 6.4. 15 seconds: step 6.6. 45 minutes: step 6.8. 10 GB threshold: step 6.9. 30 log lines: step 6.10. About 250 GB: section 2.</p>
+        <p>Swap: notes, section 8, which gives up to 8 GB for <code>swap.vhdx</code> and 0 bytes of swap used on 2026-09-10.</p>
+        <p><code>WSL_UTF8</code> and UTF-16LE: notes, section 1, rule 7. Elevation and transcripts: section 5.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Before and after sizes</h2>
+      <p>The notes contain no measured size of ext4.vhdx before or after compaction. The figures they give for checking the result are estimates:</p>
+      <table>
+        <thead><tr><th>Item</th><th class="num">Value in the notes</th><th>Basis</th></tr></thead>
+        <tbody>
+          <tr><td>ext4.vhdx before</td><td class="num">about 250 GB</td><td>Marked unverified</td></tr>
+          <tr><td>ext4.vhdx after</td><td class="num">about 145 to 160 GB</td><td>Expectation</td></tr>
+          <tr><td>Free space gained on C:</td><td class="num">about 90 to 105 GB</td><td>Derived from the 250 GB estimate and the 140 GiB of live data</td></tr>
+          <tr><td>Gain that triggers the fallbacks</td><td class="num">under 10 GB</td><td>Threshold</td></tr>
+        </tbody>
+      </table>
+      <p>No chart is drawn for these figures, because none has a measured source. A measured result needs the two readings from steps 6 and 8, and the notes instruct the operator to report those readings and to treat the estimates as sanity checks only.</p>
+      <aside class="note">
+        <p>Source: notes, section 2 (250 GB, 90 to 105 GB, 140 GiB) and step 6.9 (145 to 160 GB, 90 to 105 GB, 10 GB).</p>
+        <p>Measured numbers over estimates: notes, section 1, rule 8.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>If compaction reclaims little</h2>
+      <p>The notes give these checks in order.</p>
+      <ol class="steps">
+        <li><p><strong>Confirm the VHDX was detached during the run.</strong> Repeat step 5 until both conditions hold, then repeat step 7. The notes name a silent partial failure as the most common cause.</p></li>
+        <li>
+          <p><strong>Run the Hyper-V optimizer.</strong> Administrator. The notes describe it as more thorough than diskpart and record that its PowerShell module is available without the full hypervisor.</p>
+          <pre><code>Mount-VHD -Path $vhdx -ReadOnly -NoDriveLetter
+Optimize-VHD -Path $vhdx -Mode Full
+Dismount-VHD -Path $vhdx</code></pre>
+          <p><code>-NoDriveLetter</code> serves the same purpose as <code>automount disable</code>. If <code>Optimize-VHD</code> is missing, <code>Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-Management-PowerShell</code> installs it and may require a reboot.</p>
+        </li>
+        <li><p><strong>Find the remaining handle holder</strong> with <code>handle64.exe -accepteula ext4.vhdx</code>, or in Resource Monitor on the CPU tab under Associated Handles.</p></li>
+        <li>
+          <p><strong>Export and reimport.</strong> This builds a new VHDX that contains only live data. The notes estimate the tar for 140 GiB of live data at roughly 100 GB or more, written to a different physical drive.</p>
+          <pre><code>wsl.exe --shutdown
+wsl.exe --export &lt;distro&gt; "&lt;backup drive&gt;:\&lt;distro&gt;-backup.tar"
+# Stop here. Confirm the tar exists, has a plausible size and is readable.
+wsl.exe --unregister &lt;distro&gt;
+wsl.exe --import &lt;distro&gt; "$env:LOCALAPPDATA\Packages\&lt;distro package&gt;\LocalState" "&lt;backup drive&gt;:\&lt;distro&gt;-backup.tar"</code></pre>
+          <p><code>wsl --unregister</code> deletes the distro and cannot be undone. After the import the default user is root. Restore <code>/etc/wsl.conf</code>, keeping the existing <code>[boot]</code> section:</p>
+          <pre><code>[boot]
+systemd=true
+
+[user]
+default=&lt;user&gt;</code></pre>
+        </li>
+      </ol>
+      <aside class="note">
+        <p>Source: notes, section 7, subsections 7.1 to 7.4.</p>
+        <p>140 GiB and roughly 100 GB: subsection 7.4.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Limits and risks</h2>
+      <ul>
+        <li><strong>Back up first.</strong> When the notes were written, no backup of the 140 GiB inside the VHDX existed, and the notes identify an interrupted in-place compaction as the one step that can leave the VHDX damaged. The <code>wsl --export</code> command from fallback 4, written to a different physical drive before step 7, provides that backup. Running it first is my recommendation; the recorded procedure does not include it.</li>
+        <li><strong>Shut WSL down and keep it down.</strong> Any client that re-attaches the distro during compaction takes the handle back. On 2026-09-10 a Remote-WSL window did this within milliseconds of every shutdown.</li>
+        <li><strong>Administrator rights</strong> are needed for <code>diskpart</code> (step 7), <code>Add-MpPreference</code> (step 4), <code>Restart-Service WSLService</code> (step 5 fallback) and the Hyper-V cmdlets (fallback 2). Guest commands through <code>wsl.exe -u root</code>, <code>wsl --shutdown</code> and the size readings run unelevated. From an unelevated terminal each elevated step raises one UAC prompt, and an unattended prompt stalls the run.</li>
+        <li><strong>Do not zero-fill free space</strong> in the guest to help compaction. The notes record that it would first inflate the VHDX toward the 1007 GiB virtual capacity, which the C: drive could not hold.</li>
+        <li><strong>Do not click Format</strong> on any disk dialog during the run. A dialog means <code>automount disable</code> did not take effect; the notes say to dismiss it and abort.</li>
+        <li><strong>Automount can stay disabled.</strong> If diskpart aborts between <code>automount disable</code> and <code>automount enable</code>, newly attached USB drives stop mounting. Recovery is <code>automount enable</code> from an elevated diskpart.</li>
+        <li><strong>The Defender exclusion</strong> in step 4 stops scanning of the distro directory. The notes accept that because Defender cannot read ext4 contents.</li>
+        <li><strong>Scope.</strong> All observations come from one machine running WSL 2.7.10.0 with guest kernel 6.18.33.2-2. The notes do not record the Windows build. The compaction result was not measured, as stated above.</li>
+      </ul>
+      <aside class="note">
+        <p>Source: notes, sections 5 (elevation), 6.8 (interrupted compaction, automount), 10 (zero-fill, Format dialog) and 11 (abort and recovery).</p>
+        <p>140 GiB and 1007 GiB: section 2. WSL and kernel versions: section 2.</p>
+      </aside>
+    </section>
+  </main>
+
+  <footer>
+    Text and figures CC BY 4.0. Figures generated from <code>data.json</code> in this directory.
+  </footer>
+
+  <script src="../../assets/charts.js" defer></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+    const dark = document.documentElement.dataset.theme === "dark" ||
+      (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+    mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral",
+      fontFamily: "IBM Plex Sans, system-ui, sans-serif", securityLevel: "strict" });
+  </script>
+</body>
+</html>

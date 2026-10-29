@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>An AI agent that talks to my car over KWP2000 and UDS</title>
+  <meta name="description" content="How the MechanIQ agent in obd-scanner reads vehicle diagnostics through 18 typed MCP tools, a read-only service allowlist and a PreToolUse guard hook, and what one session on a 2017 Infiniti Q50 recorded.">
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../assets/site.css">
+  <link rel="stylesheet" href="../../assets/pages.css">
+</head>
+<body>
+  <header class="site-bar">
+    <a href="../../">Mitchell Foutz</a>
+    <a href="../../#writing">All writing</a>
+  </header>
+
+  <main class="article">
+    <section class="intro">
+      <h1>An AI agent that talks to my car over KWP2000 and UDS</h1>
+      <p class="lede">MechanIQ, the Claude agent inside the obd-scanner diagnostic app, never opens the serial port. It calls 18 typed MCP tools; deterministic code builds every CAN frame and checks every request against an allowlist of 16 service IDs. One session on a 2017 Infiniti Q50 found 13 modules and 3 stored codes, and decoded a 21-byte steering record in which 2 of 8 fields are confirmed against independent signals and 6 are labelled as inferences.</p>
+      <dl class="record">
+        <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
+        <div><dt>Topic</dt><dd>Industrial IoT</dd></div>
+        <div><dt>Source</dt><dd><a href="https://github.com/darblinko/obd-scanner">darblinko/obd-scanner</a></dd></div>
+        <div><dt>Revision</dt><dd><code>89e26e5</code></dd></div>
+      </dl>
+    </section>
+
+    <section>
+      <h2>The agent calls tools and code builds the frames</h2>
+      <p>obd-scanner is a PySide6 desktop app (Python package <code>q50diag</code>) that reads a car over KWP2000, UDS and OBD-II through an ELM327 or STN USB adapter. MechanIQ is a Claude Agent SDK agent in a side panel of that app. The <a href="https://darblinko.github.io/obd-scanner/">project page</a> describes the app, its pages and how to run it. This article covers the design decisions behind the agent's access to the car, and what one session on a car recorded.</p>
+      <p>One diagnostic read on CAN takes several steps. The adapter needs a request header and a receive filter for the module's CAN IDs. A reply longer than one frame needs ISO 15765-2 flow control and reassembly. A module that needs more time answers <code>7F &lt;service&gt; 78</code> (response pending), and the request has to be repeated with a longer timeout. Before any of this, something has to decide whether the service ID may be sent at all. In obd-scanner each of these steps is Python code with tests. The agent decides what to read.</p>
+      <p>The agent never receives a CAN ID or a serial handle. <code>read_module</code> takes a module name such as <code>EPS</code>. <code>raw_read</code> takes a module name and a hex payload such as <code>21 01</code>, or an adapter command such as <code>ATRV</code> without a module. The tool resolves the name to a request and response ID from the vehicle profile and returns JSON: decoded values with units, codes with their status, or the request and reply as text.</p>
+      <p>The code shows three reasons for this split.</p>
+      <ol>
+        <li>The adapter has one owner. <code>Session</code> runs every transport call on one worker thread. The GUI pages, parameter polling, the recorder and the agent's tools all submit commands to its queue. Inference: a second process writing to the same serial port would interleave its bytes with the session's AT commands and requests.</li>
+        <li>Code decides which bytes reach the car. <code>check_request_allowed</code> runs in <code>raw_read</code> before the request is queued, and again inside the transport for every request from any caller. A model can write any hex string; the allowlist decides which ones are sent.</li>
+        <li>Results are structured, and failures say what to do next. A handler that cannot proceed raises <code>ToolError</code> with an instruction, for example "Not connected to an adapter. Ask the user to connect on the Connect page."</li>
+      </ol>
+      <pre class="mermaid" role="img" aria-label="Layer diagram. The Claude model runs in Claude Code through the Agent SDK with permission prompts off. Every tool call passes the PreToolUse guard hook. File and shell tools are checked by its rules; the 18 tools of the in-process MCP server q50 have no rule and pass. raw_read checks the request allowlist, then all q50 tools reach app state on the Qt main thread. The GUI pages and the tools submit to one Session worker thread, which calls Transport.request. The transport checks the allowlist again, then ElmTransport sets the header, receive filter and flow control and sends ISO-TP frames through the USB adapter to the ECUs on CAN.">
+flowchart TB
+  model["Claude model: lead agent and 3 subagents"]
+  cli["Claude Code via Agent SDK, permission prompts off"]
+  hook{{"PreToolUse guard hook: every tool call"}}
+  builtin["File tools and Bash: writes inside the project only, no serial device, no secret files"]
+  mcp["In-process MCP server q50: 18 tools"]
+  gate1{{"raw_read checks the allowlist"}}
+  qt["Qt main thread: app state"]
+  pages["GUI pages and console"]
+  session["Session worker thread: one queue, one port owner"]
+  gate2{{"Transport.request checks the allowlist"}}
+  elm["ElmTransport: ATSH, ATCRA, flow control, ISO-TP"]
+  adapter["USB adapter: ELM327 or STN"]
+  ecu["ECUs on CAN: KWP2000, UDS, OBD-II"]
+  model --> cli --> hook
+  hook -->|"file and shell rules"| builtin
+  hook -->|"no rule"| mcp
+  mcp -->|"raw_read"| gate1 --> qt
+  mcp -->|"other tools"| qt
+  pages --> session
+  qt --> session
+  session --> gate2 --> elm --> adapter --> ecu
+      </pre>
+      <aside class="note">
+        <p>All file references are to <a href="https://github.com/darblinko/obd-scanner">obd-scanner</a> at <code>89e26e5</code>.</p>
+        <p>App, package and protocols: <code>README.md</code>; <code>pyproject.toml</code> line 4.</p>
+        <p>18 tools: <code>TOOL_SPECS</code>, <code>q50diag/mechaniq/tools.py</code> lines 673 to 743, counted with <code>ast</code>. Name lookup: <code>find_module</code>, lines 200 to 206.</p>
+        <p>One owner: <code>q50diag/session.py</code> docstring, lines 1 to 8.</p>
+        <p>Allowlist call sites: <code>tools.py</code> line 579; <code>transport/elm.py</code> lines 355, 366, 380; <code>transport/sim.py</code> lines 437, 452, 476.</p>
+        <p>Quoted error: <code>tools.py</code> line 304.</p>
+        <p>Diagram: <code>runner.py</code> lines 50 and 59, <code>guard.py</code> lines 144 to 153, <code>tools.py</code> lines 1 to 13, <code>session.py</code> lines 1 to 8 and 739 to 743.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Transport: from a tool call to CAN frames</h2>
+      <p>The adapter is set up once when the port opens: <code>ATE0 ATL0 ATS1 ATH1 ATAT1</code>, then the bus protocol (<code>STP33</code> or <code>ATSP6</code> for HS-CAN at 500 kbps), then <code>ATCAF1 ATCFC1 ATD0 ATAL ATFCSM0</code>. With headers on (<code>ATH1</code>) every reply line carries its CAN ID, so <code>elm_parse.py</code> reassembles single, first and consecutive frames per ID and keeps interleaved replies from two modules apart.</p>
+      <p>For each module request, <code>ElmTransport.request</code> checks the payload against the allowlist, then changes adapter state only where it differs from the last request: <code>ATSH</code> with the request ID, <code>ATCRA</code> with the response ID, the timeout in units of 4 ms (<code>ATST</code>), and flow control. Two details come from Nissan addressing and from the ELM327 command set.</p>
+      <ul>
+        <li>Flow control. Nissan modules on this car answer at the request ID plus 0x20; the EPS module uses 742 and 762. A comment in the driver states: "ELM's automatic OBD mapping is unsuitable for Nissan +0x20 addresses". For any pair other than 7E0 to 7E7 with a response ID 8 higher, the driver sets the flow control header itself with <code>ATFCSH</code>, <code>ATFCSD300000</code> and <code>ATFCSM1</code>.</li>
+        <li>Response pending. After a <code>7F xx 78</code> reply the ELM prints its prompt and stops listening. The driver repeats the request once with adaptive timing off (<code>ATAT0</code>) and the longest timeout (<code>ATSTFF</code>: 255 units of 4 ms, 1.02 s), then restores <code>ATAT1</code>.</li>
+      </ul>
+      <p>Adapter commands from the console or from <code>raw_read</code> pass to the adapter with three exceptions in <code>console_command</code>. Input containing a line break or a NUL byte is refused. An empty line is refused, because the ELM327 repeats the last request on an empty line. Nine command prefixes are refused, which the error message calls adapter programming and baud changes: <code>ATPP</code>, <code>ATBRD</code>, <code>ATBRT</code>, <code>STP</code>, <code>STBR</code>, <code>STWBR</code>, <code>STSBR</code>, <code>STRSTNVM</code> and <code>VTUPDATE</code>. The <code>STP</code> prefix also covers the protocol command that the app itself sends at setup. Hex lines typed on the console go through the same allowlist as every other request.</p>
+      <p>None of the 714 tests needs an adapter. <code>tests/fake_serial.py</code> emulates the byte stream of a vLinker FS, an OBDLink EX and a plain ELM327, and a simulator transport answers for every vehicle profile.</p>
+      <aside class="note">
+        <p>Setup sequences: <code>q50diag/transport/elm.py</code> lines 42 to 43. Bus commands: <code>transport/adapters.py</code> line 32.</p>
+        <p>Addressing, flow control, timeout: <code>elm.py</code> lines 284 to 316; the quoted comment is line 298. Q50 response offsets <code>(0x20, 8)</code>: <code>vehicles/q50.py</code> line 41.</p>
+        <p>Response pending: <code>elm.py</code> lines 331 to 350; the 1.02 s retry timeout is line 345.</p>
+        <p>Console filter: <code>transport/elm_parse.py</code> lines 135 to 149; the empty line message is line 141.</p>
+        <p>714 tests: <code>pytest --collect-only -q</code> and <code>pytest -q</code> (714 passed, 93.19 s) with <code>QT_QPA_PLATFORM=offscreen</code> on 2026-10-28. Emulated adapters: <code>README.md</code>, "Safety tests".</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>The services it speaks, and the ones it refuses</h2>
+      <p><code>check_request_allowed</code> in <code>q50diag/core/transport.py</code> is an allowlist keyed on the first payload byte. 16 service IDs pass it without a flag. Two more, 04 and 14 (clear codes), pass only with <code>allow_clear=True</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Service ID</th><th>Service</th><th>Where the app sends it</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>01 02 03 05 06 07 09 0A</code></td><td>OBD-II read modes: live data, freeze frame, stored, pending and permanent codes, test results, vehicle information</td><td>Overview, live data and OBD-II code pages; 218 mode 01 PIDs are defined</td></tr>
+            <tr><td><code>10</code></td><td>Diagnostic session control, sub-functions 01, 03, 81, 89 and C0 only</td><td><code>10 C0</code> (Nissan CONSULT session), falling back to <code>10 03</code>, before Nissan reads; <code>10 81</code> during discovery</td></tr>
+            <tr><td><code>17 18</code></td><td>KWP2000 read codes</td><td><code>18 00 FF 00</code> on Nissan modules. No code in the package builds a 17 request; 17 passes the gate only as a raw read from the console or <code>raw_read</code>.</td></tr>
+            <tr><td><code>19</code></td><td>UDS read DTC information</td><td><code>19 02 FF</code>: Nissan fallback, Ford modules</td></tr>
+            <tr><td><code>1A</code></td><td>KWP2000 read ECU identification</td><td><code>1A 81</code>, <code>1A 87</code></td></tr>
+            <tr><td><code>21</code></td><td>KWP2000 read data by local identifier</td><td><code>21 83</code> identification, <code>21 01</code> EPS live block, explorer range <code>21 00</code> to <code>21 FF</code></td></tr>
+            <tr><td><code>22</code></td><td>UDS read data by identifier</td><td><code>22 F187</code>, <code>F18C</code>, <code>F190</code>; ABS steering angle <code>22 1208</code>; Ford <code>F190</code>, <code>F188</code>, <code>F113</code></td></tr>
+            <tr><td><code>3E</code></td><td>Tester present</td><td><code>3E 00</code>, the only probe sent to unknown IDs</td></tr>
+            <tr><td><code>04 14</code></td><td>Clear codes (OBD-II, KWP2000)</td><td>Trouble Codes page, after a confirmation dialog</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Everything else raises <code>RequestBlocked</code>. The test list <code>BLOCKED</code> holds 10 payloads: ECU reset <code>11 01</code>, security access <code>27 01</code>, write by identifier <code>2E 10 01</code>, routine control <code>31 01</code>, I/O control <code>2F 01</code>, request download <code>34 00</code>, programming session <code>10 02</code>, OBD clear <code>04</code> and KWP clear <code>14 FF 00</code> without the flag, and an empty request. Each is sent to both transports through <code>request</code>, <code>request_functional</code> and <code>raw_command</code>, and the test asserts that the fake serial port received no bytes. A separate test sends 5 payloads (reset, security access, write by identifier, clear without the flag, routine control) through <code>raw_read</code>, and another refuses OBD mode 08 (on-board test control, which actuates components) in 2 forms.</p>
+      <p>The agent cannot clear codes. <code>raw_read</code> calls the allowlist without the flag, and the session forwards the agent's request to the transport without it. The only caller that sets <code>allow_clear=True</code> is the clear routine started from the Trouble Codes page after the user confirms a dialog.</p>
+      <p>Module discovery follows the same rule. Each of the 15 addresses in the Q50 profile is probed with <code>3E 00</code>, <code>10 81</code> and <code>21 83</code> until one gets a positive reply. The remaining IDs from 0x700 to 0x7FF get tester present only; the code comment reads "Unknown addresses get tester present only, so no session is started on them." The sweep never transmits on a response ID or on 0x7DF.</p>
+      <p>The allowlist call lives in each transport implementation, <code>ElmTransport</code> and <code>SimulatedTransport</code>. The abstract <code>Transport.request</code> states the contract in its docstring, and the parametrized test covers both implementations. Inference: a third transport would need its own call and its own test case.</p>
+      <aside class="note">
+        <p>Allowlist: <code>q50diag/core/transport.py</code> lines 44 to 69. 16 and 18: every first byte from 0x00 to 0xFF was passed to <code>check_request_allowed</code> with second byte 0x03; 16 passed with <code>allow_clear=False</code>, 18 with <code>True</code>.</p>
+        <p>218 PIDs: <code>len(MODE01_PIDS)</code>, <code>protocol/obd2.py</code> line 106.</p>
+        <p>Nissan requests: <code>protocol/nissan.py</code> lines 24 to 41 (session), 44 to 57 (identification), 70 to 84 (codes), 87 to 100 (clear). Ford: <code>protocol/ford.py</code> line 27. Explorer ranges: <code>vehicles/q50.py</code> line 42. Service 17: comment at <code>core/transport.py</code> lines 47 to 48; no sender found by <code>grep</code> over <code>q50diag/</code>.</p>
+        <p>Blocked payloads: <code>tests/test_backend_integration.py</code> lines 185 to 215. <code>raw_read</code>: <code>tests/test_mechaniq_tools.py</code> line 236. Mode 08: <code>tests/test_elm.py</code> lines 268 to 269.</p>
+        <p>Clear path: <code>tools.py</code> line 579; <code>session.py</code> lines 279 to 281 and 743; <code>gui/pages/trouble_codes.py</code> lines 216 to 242.</p>
+        <p>Discovery: <code>protocol/discovery.py</code> lines 12 to 15, 33 to 43 and 50; <code>tests/test_discovery_safety.py</code>. 15 addresses: <code>KNOWN_MODULES</code>, <code>protocol/modules.py</code> lines 10 to 26.</p>
+        <p>Contract: <code>core/transport.py</code> lines 88 to 101.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>18 tools in the app's own process</h2>
+      <p><code>build_mcp_server</code> creates an in-process MCP server named <code>q50</code> with the Agent SDK's <code>create_sdk_mcp_server</code>. The tools are methods on the running app, and the agent sees them as <code>mcp__q50__&lt;name&gt;</code>. Because they run in the app's process, they read the same parameter store, recorder and event markers that the GUI shows, and their vehicle requests enter the same session queue as the pages' requests.</p>
+      <p>The handlers run on the SDK's asyncio thread. Every read or change of app state is moved onto the Qt main thread with <code>call_in_main_thread</code>, wrapped in <code>asyncio.to_thread</code> so that neither the Qt thread nor the asyncio loop blocks. Tools whose result arrives as a session signal connect a one-shot catcher, submit the command and wait with a timeout: 8 s for <code>raw_read</code>, 45 s for <code>read_module</code> and 120 s for <code>scan_dtcs</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Group (this article's grouping)</th><th class="num">Tools</th><th>Names</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>App state, no vehicle traffic</td><td class="num">4</td><td><code>get_status</code>, <code>list_parameters</code>, <code>get_readings</code>, <code>get_dtcs</code></td></tr>
+            <tr><td>Vehicle requests</td><td class="num">3</td><td><code>scan_dtcs</code>, <code>read_module</code>, <code>raw_read</code></td></tr>
+            <tr><td>Polling and event marks</td><td class="num">5</td><td><code>start_polling</code>, <code>stop_polling</code>, <code>start_steering_watch</code>, <code>stop_steering_watch</code>, <code>mark_event</code></td></tr>
+            <tr><td>Recordings and log</td><td class="num">3</td><td><code>list_recordings</code>, <code>read_recording</code>, <code>read_app_log</code></td></tr>
+            <tr><td>GUI</td><td class="num">1</td><td><code>navigate</code></td></tr>
+            <tr><td>Code changes</td><td class="num">2</td><td><code>apply_change</code>, <code>undo_change</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The lead agent can start three subagents. <code>code-fixer</code> edits code. <code>data-analyst</code> and <code>test-coach</code> have <code>Edit</code>, <code>Write</code>, <code>NotebookEdit</code>, <code>apply_change</code> and <code>undo_change</code> in their disallowed tools. <code>test-coach</code> also has Bash in that list. <code>data-analyst</code> keeps Bash, which its prompt allows for read-only Python statistics in a source checkout.</p>
+      <p>The vehicle profile writes the car section of the system prompt. For the Q50 it carries the field findings described below: the EPS address, the <code>21 01</code> byte layout with each unconfirmed field marked "(inferred)" or "candidate", the gatewayed OBD port and the stored codes. The prompt's style section ends: "Label inferences as inferences."</p>
+      <p>One tool lets the agent change the app itself. <code>apply_change</code> runs the related tests with <code>pytest -q -x</code> (300 s timeout), hot reloads the changed modules and commits only the listed files locally as <code>fix(mechaniq): &lt;summary&gt;</code>. A failing test stops it before the reload and the commit.</p>
+      <aside class="note">
+        <p>Server: <code>q50diag/mechaniq/tools.py</code> lines 759 to 770; tool registration lines 746 to 756.</p>
+        <p>Threading and timeouts: <code>tools.py</code> lines 1 to 13 and 43 to 45; <code>mechaniq/mainthread.py</code> lines 1 to 7.</p>
+        <p>Groups: the 18 entries of <code>TOOL_SPECS</code>, lines 673 to 743, sorted by this article. Descriptions at lines 692 and 693 state that <code>get_dtcs</code> does not contact the car and <code>scan_dtcs</code> does.</p>
+        <p>Subagents: <code>mechaniq/prompt.py</code> lines 18 to 21 and 152 to 176.</p>
+        <p>Car section: <code>vehicles/q50.py</code> lines 12 to 25. Quoted line: <code>prompt.py</code> line 79.</p>
+        <p>Change gate: <code>mechaniq/changes.py</code> lines 1 to 9 and 34.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>The guard hook</h2>
+      <p>The runner starts the Claude Code session with <code>permission_mode="bypassPermissions"</code> and one PreToolUse hook. With no permission prompts, the hook decides every tool call. The docstring of <code>guard.py</code> states it: "MechanIQ runs with permission prompts off, so this hook is the hard boundary." The hook is registered without a matcher, so it receives every call. It has rules for 9 tool names (4 write tools, 3 read tools, Bash and PowerShell) and returns no decision for the rest, which includes the 18 q50 tools and <code>Task</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Rule</th><th>Checked in</th><th>A denied input from the tests</th><th class="num">Cases</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>File writes outside the project</td><td>Write, Edit, MultiEdit, NotebookEdit</td><td><code>NotebookEdit</code> on <code>/tmp/n.ipynb</code></td><td class="num">5</td></tr>
+            <tr><td>Bash writes outside the project</td><td>Bash redirects and <code>tee</code></td><td><code>ls | tee /tmp/listing.txt</code></td><td class="num">4</td></tr>
+            <tr><td>Serial device access</td><td>Bash</td><td><code>screen /dev/ttyUSB0 115200</code></td><td class="num">6</td></tr>
+            <tr><td><code>.env</code> files and the settings file</td><td>Read, Grep, Glob, Bash, Write</td><td><code>source ./.env &amp;&amp; pytest</code></td><td class="num">12</td></tr>
+            <tr><td><code>git push</code></td><td>Bash</td><td><code>cd q50diag &amp;&amp; git push</code></td><td class="num">4</td></tr>
+            <tr><td><code>git reset --hard</code>, <code>git clean</code></td><td>Bash</td><td><code>git status; git clean -n</code></td><td class="num">4</td></tr>
+            <tr><td>PowerShell</td><td>PowerShell</td><td><code>Get-ChildItem</code></td><td class="num">1</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The 7 deny rules account for 36 cases. 22 more are allow cases, which act as controls: a guard that denied everything would fail them. The last 4 test the hook plumbing: other hook events pass through, relative paths resolve against the working directory, unbalanced quotes fall back to text checks, and segments split on separators. The <a href="https://darblinko.github.io/obd-scanner/">project page</a> charts the deny and allow counts. One of them is the commit <code>git commit -m "fix(mechaniq): push EPS reads earlier; COM5 note; reset --hard docs"</code>, whose message contains the words of three deny rules.</p>
+      <p>The Bash rules work on parsed commands. <code>shell_segments</code> splits a command with <code>shlex</code> into simple commands at <code>;</code>, <code>|</code>, <code>&amp;</code>, parentheses and line breaks, so quoted text stays inside its argument. For a segment that runs git, the subcommand is found after git's own options, which is how <code>git -C /x push --force</code> is caught. The serial patterns (<code>/dev/tty</code>, <code>/dev/serial</code>, <code>COMn</code>, <code>serial.Serial(</code>, <code>serial_for_url</code>, <code>miniterm</code>) apply to segments that do not run git. Redirect and <code>tee</code> targets are resolved against the working directory and checked as file writes; <code>/dev/null</code>, <code>/dev/stdout</code>, <code>/dev/stderr</code> and <code>$VARIABLE</code> targets are skipped. The secret check runs on the raw text before <code>shlex</code>, with backslashes turned into slashes, because <code>shlex</code> drops the backslashes of an unquoted Windows path. A command with unbalanced quotes falls back to regular expressions for push, discard and serial access.</p>
+      <p>Each denial names what to do instead. The serial rule returns: "Bash may not open a serial device or adapter port: the q50diag app owns the connection. Use the q50 tools (raw_read, read_module, get_readings) for vehicle access. To search code for this text, use the Grep tool." Inference: the last sentence covers a code search whose text matches a serial pattern, such as a search for <code>/dev/tty</code>; a <code>Grep</code> call for <code>serial.Serial</code> is one of the allowed test cases.</p>
+      <p>The same docstring states the limit: "The Bash checks are a guard against mistakes, not a sandbox: a script file can still do anything its interpreter allows."</p>
+      <aside class="note">
+        <p>Runner options: <code>q50diag/mechaniq/runner.py</code> lines 50 and 59.</p>
+        <p>Rules: <code>mechaniq/guard.py</code> lines 1 to 12 (docstring), 22 to 23 (tool names), 26 to 29 (PowerShell), 35 to 46 (patterns), 91 to 127 (segments and write targets), 144 to 153 (dispatch), 189 to 229 (Bash).</p>
+        <p>Cases: <code>pytest --collect-only -q tests/test_mechaniq_guard.py</code>, grouped by test function: 13 functions, 62 cases. The table uses the parametrized lists at lines 37 to 116 and the PowerShell test at line 185. The 4 plumbing cases are at lines 158 to 182. All 62 passed in the full run.</p>
+        <p>Allowed controls: lines 118 to 155. The commit case is line 144; the <code>Grep</code> case is line 126.</p>
+        <p>Quoted message: <code>SERIAL_MESSAGE</code>, <code>guard.py</code> lines 61 to 65.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>One session on a 2017 Q50: modules and codes</h2>
+      <p>On 2026-10-17 the app was connected to a 2017 Infiniti Q50 3.0t through a vLinker FS r2 adapter (STN1170 firmware v4.3.2) at 115200 baud, about 16 ms per command. The complaint was steering that intermittently feels stiff and sluggish. The car has no DAS: its Drive Mode Selector offers Standard and Sport steering only, and there is no power steering fluid reservoir, so it has a rack electric power steering (EPS) unit.</p>
+      <p>Every field value in this article comes from <code>docs/q50-findings-2026-10-17.md</code>. That document records what was read and decoded. It does not record which requests MechanIQ issued and which came from the GUI pages or the console, and this article makes no claim about the agent's share of the session.</p>
+      <p>A 65 s discovery sweep found 13 modules.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Module</th><th>Request/response ID</th><th>Stored codes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>ECM, TCM</td><td>7E0/7E8, 7E1/7E9</td><td>none</td></tr>
+            <tr><td>EPS</td><td>742/762</td><td>none</td></tr>
+            <tr><td>ABS</td><td>740/760</td><td>none</td></tr>
+            <tr><td>RADAR</td><td>723/735</td><td>C1A01-00, C1A16-00</td></tr>
+            <tr><td>AIR BAG</td><td>752/772</td><td>B00A0-00</td></tr>
+            <tr><td>METER, HVAC, BCM, AV, IPDM, TPMS</td><td>743, 744, 745, 747, 74D, 758</td><td>none</td></tr>
+            <tr><td>Unknown</td><td>7F1/7F9</td><td>Answers tester present only. The document labels "possibly the CAN gateway" as an inference.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>12 of the 15 addresses in the Q50 profile answered. AWD (748), STEERING ANGLE (75C) and ADAS (707) did not.</p>
+      <p>Two modules store three codes, each with status 0x08: confirmed, not currently failing. The EPS, ECM and ABS store none. The engine has the MIL off, 0 OBD-II codes and all readiness monitors complete. None of the three stored codes has a description in the app's code table, and the document states that their Q50 meanings need the factory service manual.</p>
+      <figure class="chart" data-chart="dtc-coverage"></figure>
+      <p>The OBD port on this car is gatewayed. An unfiltered 5 s bus monitor received 0 broadcast frames, so every value in the session was polled from a module. The Q50 prompt notes pass this to the agent, with broadcast IDs such as 0x002, 0x300 and 0x5E4 listed as not readable at the port.</p>
+      <aside class="note">
+        <p>Vehicle, adapter, complaint: <code>docs/q50-findings-2026-10-17.md</code> lines 1 to 4.</p>
+        <p>Modules and codes: lines 9 to 23. Engine: line 10. Gateway: line 11.</p>
+        <p>12 of 15: the 15 entries of <code>KNOWN_MODULES</code> (<code>protocol/modules.py</code> lines 10 to 26) compared with the 12 named modules in the findings table. The module docstring, lines 4 to 5, gives the same count.</p>
+        <p>Descriptions: <code>data/dtc_descriptions.py</code>; counts by <code>len()</code> after import (465, 12, 0); <code>describe_generic()</code> returns an empty string for C1A01, C1A16 and B00A0, and none is a key of <code>NISSAN_DESCRIPTIONS</code> (lines 312 to 329).</p>
+        <p>Prompt notes: <code>vehicles/q50.py</code> lines 15 to 16.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>One session on a 2017 Q50: the steering record</h2>
+      <p>The EPS module answered Nissan local identifiers (<code>21 xx</code>) only; six <code>22 xxxx</code> ranges returned nothing. The project's research notes state that no public source gives EPS identifiers for the Q50. <code>21 06</code> returned a 280-byte block, which the document labels an inference: a stored event history, not decoded.</p>
+      <p>The 21-byte live block <code>21 01</code> was decoded from 97 samples with the wheel at rest and 215 samples during lock-to-lock turns, compared with the steering angle that the ABS module reports through <code>22 1208</code>. The confidence column is copied from the findings document.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Bytes</th><th>Meaning</th><th>Confidence</th><th>Observed</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>0 to 1</td><td>Supply voltage, x 4 mV</td><td>Matches ATRV</td><td>14.0 to 14.25 V at rest, 13.26 V pushing into full lock</td></tr>
+            <tr><td>3 to 4</td><td>Steering angle, signed, x -0.1 deg</td><td>Correlation -1.00 with ABS angle</td><td>-543 to +553 deg</td></tr>
+            <tr><td>5 to 6</td><td>Steering velocity, signed</td><td>Inferred</td><td>About -3.7 deg/s per count, 0 when held</td></tr>
+            <tr><td>7</td><td>Assist load</td><td>Inferred</td><td>0 at rest, up to 25 at full lock</td></tr>
+            <tr><td>8</td><td>Driver torque, signed</td><td>Inferred</td><td>+49 holding left lock, -59 pushing right lock</td></tr>
+            <tr><td>10</td><td>Temperature candidate</td><td>Inferred</td><td>Rose from 45 to 53 as the car warmed</td></tr>
+            <tr><td>11</td><td>Assist limit candidate</td><td>Inferred</td><td>100 in every sample</td></tr>
+            <tr><td>15 to 16</td><td>Motor speed candidate, signed</td><td>Inferred</td><td>0 at rest, about -3 counts per deg/s of steering rate</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Two fields are confirmed against an independent signal: the supply voltage matches the adapter's <code>ATRV</code> reading, and the angle correlates at -1.00 with the ABS angle. The other six are inferences. The labels carry into the code. The unconfirmed fields are named with "raw" or "candidate", for example "EPS byte 11 (raw, assist limit candidate)", and the description of each unconfirmed field ends with "Inferred from a wheel-turn capture; scale unconfirmed."</p>
+      <p>A worked example, computed for this article: the simulator keeps the <code>21 01</code> reply that the car returned at rest, <code>0D BD 02 00 8F 00 00 00 00 00 35 64 00 00 60 00 00 00 00 00 00</code>. The app's decoders read it as follows. Bytes 0 and 1, 0x0DBD, are 3517 counts of 4 mV, 14.068 V, inside the 14.0 to 14.25 V the document gives at rest. Bytes 3 and 4, 0x008F, are 143 counts of -0.1 deg, -14.3 deg. Bytes 7 and 8 are 0. Byte 10 is 0x35, 53. Byte 11 is 0x64, 100. Bytes 15 and 16, the motor speed candidate, are 0.</p>
+      <aside class="note">
+        <p>EPS identifiers and decode: <code>docs/q50-findings-2026-10-17.md</code> lines 25 to 40. No public source: <code>docs/research/q50-diagnostics.md</code> line 56.</p>
+        <p>ABS reference <code>22 1208</code>: <code>protocol/nissan.py</code> lines 228 to 230; <code>vehicles/q50.py</code> line 22.</p>
+        <p>Field names and the quoted description: <code>nissan.py</code> lines 231 to 313.</p>
+        <p>Worked example: <code>EPS_RECORD_AT_REST</code>, <code>transport/sim.py</code> line 37, passed through <code>nissan.eps_fields()</code> on 2026-10-28. Outputs: 14.068, -14.3, 0, 0, 0, 53, 100, 0.</p>
+        <p>Eighth field: <code>nissan.py</code> lines 303 to 312.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>One session on a 2017 Q50: live data, drive and outcome</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Value</th><th>Source</th><th>Observed</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Battery voltage, engine running</td><td><code>ATRV</code></td><td>14.0 to 14.5 V (drive and parked)</td></tr>
+            <tr><td>ECM module voltage</td><td>PID 42</td><td>13.44 to 13.84 V</td></tr>
+            <tr><td>Coolant, warm idle</td><td>PID 05</td><td>97 to 99 degC</td></tr>
+            <tr><td>Idle speed</td><td>PID 0C</td><td>638 to 650 rpm</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>A 330 s drive recording has 3 "Steering felt heavy" marks: at 5 s (stopped, -15 deg), at 31 s (2 km/h, +533 deg, near full lock) and at 57 s (36 km/h, -8 deg). Voltage at all three marks was 14.0 to 14.3 V, and the document concludes that low voltage is excluded as the cause of those events. The recording has no EPS data, and speed and angle were sampled only every 3.7 s, so assist at the marks is unknown. The recording is not in the repository.</p>
+      <p>The document's summary for the complaint: the EPS module stores no codes; during the parked wheel-turn test the supply voltage stayed above 13.2 V, assist rose with steering effort, and the assist limit candidate stayed at 100 in every sample. No captured value shows an EPS fault. The complaint was not reproduced during a capture that included EPS data.</p>
+      <p>The next steps it lists are a drive with the rebuilt Steering page recording, which includes EPS assist, torque and assist limit, and a lookup of the three codes in the Q50 service manual. If a marked event then shows normal assist load and no limit reduction, the document states that the cause is likely outside the EPS electronics. It names tire pressure, alignment, tie rods and rack friction as candidates, labels them inferences, and states that none of them was measured.</p>
+      <aside class="note">
+        <p>Live data: <code>docs/q50-findings-2026-10-17.md</code> lines 42 to 49.</p>
+        <p>Drive recording: lines 51 to 53.</p>
+        <p>Summary: line 8. Next steps: lines 59 to 63.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Limits</h2>
+      <h3>Not tested on hardware</h3>
+      <ul>
+        <li>Field data covers one car, one adapter and one session, on 2026-10-17.</li>
+        <li>The two Mustang S550 profiles (9 modules each) come from public address lists. The repository holds no field capture from a Mustang.</li>
+        <li>MS-CAN on the vLinker FS is untested. The OBDLink EX and plain ELM327 support is tested against emulated byte streams only.</li>
+        <li>The sample rate of the rebuilt Steering page recording on the car is not yet measured.</li>
+        <li>The simulator replays a 90 s drive cycle: idle to 15 s, acceleration to 95 km/h by 40 s, cruise to 70 s, deceleration to 90 s. Apart from the stored EPS record, its values are synthetic and say nothing about the car.</li>
+      </ul>
+      <h3>Read-only by allowlist</h3>
+      <ul>
+        <li>No write, reset, security access, routine, I/O control, download or programming service is on the allowlist. Codes can be cleared only from the Trouble Codes page after a confirmation dialog. The agent has no tool that clears codes.</li>
+        <li>Adapter commands are filtered by a list of refused prefixes, which is a block list. Any AT, ST or VT command outside that list reaches the adapter, including from <code>raw_read</code>.</li>
+      </ul>
+      <h3>Inferred fields</h3>
+      <ul>
+        <li>Six of the eight decoded EPS fields in the findings document are inferences, and their scales are unconfirmed.</li>
+        <li>The steering complaint was not reproduced while EPS data was captured, so no decoded field has yet been observed during a heavy steering event.</li>
+      </ul>
+      <h3>The guard hook</h3>
+      <ul>
+        <li>The hook is designed to catch agent mistakes. A script the agent writes inside the project can do anything its interpreter allows. Reads outside the project are allowed, except of the secret files; one allowed test case reads a dotfile in the home directory. Permission prompts and an operating system sandbox are not used.</li>
+        <li><code>data-analyst</code> and <code>test-coach</code> are denied the edit tools and <code>apply_change</code>; <code>test-coach</code> is also denied Bash. <code>data-analyst</code> keeps Bash, and a Bash redirect inside the project passes the guard, so its read-only role inside the project rests on its prompt. The disallowed lists omit <code>MultiEdit</code> because the Claude Code CLI bundled with the pinned Agent SDK has no such tool; the guard still checks it as a write tool.</li>
+        <li>The findings document does not record which requests the agent made during the field session.</li>
+      </ul>
+      <aside class="note">
+        <p>Mustang, MS-CAN, emulation: <code>README.md</code>, "Design decisions and limitations" and "Safety tests"; <code>transport/adapters.py</code> line 47; <code>vehicles/mustang.py</code>, 9 module entries. Module counts per profile: <code>len(vehicle.modules)</code> over <code>VEHICLES</code> gives 15, 9 and 9.</p>
+        <p>Sample rate: <code>docs/q50-findings-2026-10-17.md</code> line 61.</p>
+        <p>Drive cycle: <code>transport/sim.py</code> lines 154 to 169; stored record line 37.</p>
+        <p>Allowlist and clear path: see the services section. Adapter filter: <code>transport/elm_parse.py</code> lines 142 to 145.</p>
+        <p>Guard limit: <code>mechaniq/guard.py</code> lines 11 to 12; read case <code>tests/test_mechaniq_guard.py</code> line 124. Subagent tools: <code>mechaniq/prompt.py</code> lines 18 to 21, 163 to 166 and 172 to 173; Bash use for the analyst: line 122.</p>
+      </aside>
+    </section>
+  </main>
+
+  <footer>
+    Text and figures CC BY 4.0. Figures generated from <code>data.json</code> in this directory.
+  </footer>
+
+  <script src="../../assets/charts.js" defer></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+    const dark = document.documentElement.dataset.theme === "dark" ||
+      (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+    mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral",
+      fontFamily: "IBM Plex Sans, system-ui, sans-serif", securityLevel: "strict" });
+  </script>
+</body>
+</html>

@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sandboxing Codex CLI with bubblewrap on WSL</title>
+  <meta name="description" content="A 2026-08-30 probe showed Codex CLI in read-only mode reading outside its working directory; the codex-sandbox wrapper in agent-controls runs Codex in a bubblewrap mount namespace that holds only one configured root.">
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../../assets/site.css">
+  <link rel="stylesheet" href="../../assets/pages.css">
+  <style>
+    .nowrap { white-space: nowrap; }
+    @media (max-width: 600px) { .nowrap { white-space: normal; } }
+  </style>
+</head>
+<body>
+  <header class="site-bar">
+    <a href="../../">Mitchell Foutz</a>
+    <a href="../../#writing">All writing</a>
+  </header>
+
+  <main class="article">
+    <section class="intro">
+      <h1>Sandboxing Codex CLI with bubblewrap on WSL</h1>
+      <p class="lede">A probe on 2026-08-30 showed Codex CLI, started with <code>--sandbox read-only</code>, reading a file at an absolute path outside its working directory and listing the root of an unrelated repository. The <code>codex-sandbox</code> wrapper in agent-controls runs Codex in a bubblewrap mount namespace that holds only the configured root containing the current directory. Paths outside that root, other than a fixed set of system and configured paths, do not exist for the Codex process.</p>
+      <dl class="record">
+        <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
+        <div><dt>Topic</dt><dd>Agent engineering</dd></div>
+        <div><dt>Source</dt><dd><a href="https://github.com/darblinko/agent-controls">darblinko/agent-controls</a></dd></div>
+        <div><dt>Revision</dt><dd><code>fb209b2</code></dd></div>
+        <div><dt>Codex CLI version in the probe</dt><dd>Not recorded</dd></div>
+      </dl>
+    </section>
+
+    <section>
+      <h2>The 2026-08-30 probe: read-only mode left reads open</h2>
+      <p>The header of <code>bin/codex-sandbox</code> records the probe. Codex was started in read-only mode. It read a file at an arbitrary absolute path outside its <code>--cd</code> directory, and it listed the root of an unrelated repository.</p>
+      <p>The repository draws two conclusions from that result. The <code>--sandbox read-only</code> policy restricts writes and leaves reads open. The project trust settings in Codex's <code>config.toml</code> govern approval prompts and do not set a filesystem scope.</p>
+      <p>The threat model adds an inference: under the read-only policy, any file the user can read can become part of a Codex prompt, and a prompt leaves the machine. The threat model labels this T3.</p>
+      <p>The record has gaps. The Codex CLI version used in the probe was not recorded. The record states the outcome; it does not include the command line, the transcript or the paths used. Codex behavior may have changed since that date. Codex was not run for this article. The threat model gives a reproduction procedure whose outcome depends on the installed Codex version.</p>
+      <p>Inference: the wrapper's boundary does not depend on how a given Codex version applies its own policy, because a path that is not mounted in the namespace does not exist for any process inside it.</p>
+      <aside class="note">
+        <p>Probe record: <code>bin/codex-sandbox</code> lines 5 to 11 at <code>fb209b2</code>.</p>
+        <p>Inference T3: <code>docs/threat-model.md</code> lines 22 and 37. Version gap: same file, line 35, and <code>README.md</code> line 182.</p>
+        <p>Reproduction procedure: <code>docs/threat-model.md</code> lines 67 to 76.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Mount layout inside the namespace</h2>
+      <p>The wrapper reads <code>sandbox.conf</code>, finds the configured root that contains the current directory, and starts bubblewrap with the layout below. Only that root is bound. The other configured roots are absent for that session. <code>tool</code> and <code>state</code> paths from the config are bound in every session.</p>
+      <pre class="mermaid" role="img" aria-label="The shell runs codex-sandbox, which reads sandbox.conf. If the current directory is outside every configured root, the wrapper exits 1 and no namespace is created. Otherwise it starts a bubblewrap namespace that shares the host network. Inside it, the matched rw root and the state paths are read-write; the system directories, the tool paths and a matched ro root or its listed subtrees are read-only; /proc and /dev are new mounts; /tmp, /home, HOME and /mnt are empty tmpfs mounts; .env files and mask matches in the root, outside the pruned directories, are overmounted with /dev/null. Other roots and repositories, unlisted subtrees and .git of a subtree root, dotfiles in HOME, /init, the Windows drives and /run, except a resolv.conf target, are absent.">
+flowchart TB
+  shell["codex ... in a configured root"] --> wrapper["codex-sandbox"]
+  conf[("sandbox.conf")] --> wrapper
+  wrapper -->|"cwd outside every root"| refuse["exit 1, no namespace"]
+  wrapper -->|"cwd inside a root"| ns
+  subgraph ns["bubblewrap namespace, host network shared"]
+    direction TB
+    rw["read-write: the matched rw root, state paths"]
+    ro["read-only: /usr /bin /sbin /lib /lib64 /etc, tool paths, the matched ro root or its listed subtrees"]
+    fresh["new mounts: /proc, /dev; empty tmpfs on /tmp, /home, $HOME, /mnt"]
+    masked["over /dev/null: .env* and mask matches in the root, pruned dirs excepted"]
+    rw ~~~ ro ~~~ fresh ~~~ masked
+  end
+  subgraph gone["absent from the namespace"]
+    direction TB
+    other["other roots and repositories"]
+    sub["unlisted subtrees and .git of a subtree root"]
+    dot["dotfiles in $HOME"]
+    wsl["/init, Windows drives under /mnt, /run except a resolv.conf target"]
+    other ~~~ sub ~~~ dot ~~~ wsl
+  end
+  ns ~~~ gone
+</pre>
+      <table>
+        <thead><tr><th>Path inside the namespace</th><th>State</th><th class="num nowrap">Line</th></tr></thead>
+        <tbody>
+          <tr><td><code>/usr</code>, <code>/etc</code></td><td>Read-only bind</td><td class="num nowrap">218, 222</td></tr>
+          <tr><td><code>/bin</code>, <code>/sbin</code>, <code>/lib</code>, <code>/lib64</code></td><td>Read-only bind when the host has the path (<code>--ro-bind-try</code>)</td><td class="num nowrap">219 to 221</td></tr>
+          <tr><td>Target of <code>/etc/resolv.conf</code> when it lies outside <code>/etc</code></td><td>Read-only bind of that one file, for DNS</td><td class="num nowrap">223 to 228</td></tr>
+          <tr><td><code>/proc</code>, <code>/dev</code></td><td>New procfs and new <code>/dev</code></td><td class="num nowrap">229</td></tr>
+          <tr><td><code>/tmp</code>, <code>/home</code>, <code>$HOME</code>, <code>/mnt</code></td><td>Empty tmpfs</td><td class="num nowrap">222, 229</td></tr>
+          <tr><td><code>tool</code> paths</td><td>Read-only bind</td><td class="num nowrap">275</td></tr>
+          <tr><td><code>state</code> paths, for example <code>$HOME/.codex</code></td><td>Read-write bind, created when missing</td><td class="num nowrap">109 to 111, 276</td></tr>
+          <tr><td>The matched <code>rw</code> root</td><td>Read-write bind</td><td class="num nowrap">241 to 242</td></tr>
+          <tr><td>The matched <code>ro</code> root</td><td>Read-only bind</td><td class="num nowrap">243 to 244</td></tr>
+          <tr><td>An <code>ro</code> root with a subtree list</td><td>Read-only binds of the listed subtrees that exist; the rest of the root, <code>.git</code> included, is absent</td><td class="num nowrap">248 to 254</td></tr>
+          <tr><td><code>.env*</code> and <code>mask</code> matches in the bound root</td><td><code>/dev/null</code> bound read-only over each file</td><td class="num nowrap">198 to 214, 278 to 280</td></tr>
+          <tr><td>Network</td><td>Host network namespace kept (<code>--share-net</code>)</td><td class="num nowrap">289</td></tr>
+          <tr><td>Other namespaces</td><td>New (<code>--unshare-all</code>)</td><td class="num nowrap">289</td></tr>
+        </tbody>
+      </table>
+      <aside class="note">
+        <p>Line numbers in the table refer to <code>bin/codex-sandbox</code> at <code>fb209b2</code>. The namespace summary in its header is lines 13 to 30.</p>
+        <p>Config keywords: <code>examples/sandbox.conf</code> lines 6 to 17. One root per session, longest match on nesting: lines 19 to 20.</p>
+        <p><code>--unshare-all</code> is described by <code>bwrap --help</code> (bubblewrap 0.9.0) as "Unshare every namespace we support by default".</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>The bubblewrap arguments</h2>
+      <p><code>base_args</code> builds the fixed part of the command. <code>main</code> appends the tool, state and root binds, the <code>/dev/null</code> masks, the environment changes and the namespace flags.</p>
+      <figure class="code">
+        <pre><code>  bwrap_args=(--ro-bind /usr /usr)
+  for dir in /bin /sbin /lib /lib64; do
+    bwrap_args+=(--ro-bind-try "$dir" "$dir")
+  done
+  bwrap_args+=(--ro-bind /etc /etc --tmpfs /mnt)
+  # /etc/resolv.conf is often a symlink into /mnt/wsl or /run; bind its target
+  # alone so DNS works while the rest of /mnt and /run stays absent.
+  resolv=$(readlink -f /etc/resolv.conf 2&gt;/dev/null || true)
+  if [[ -n $resolv &amp;&amp; $resolv != /etc/* ]]; then
+    bwrap_args+=(--ro-bind-try "$resolv" "$resolv")
+  fi
+  bwrap_args+=(--proc /proc --dev /dev --tmpfs /tmp --tmpfs /home --tmpfs "$HOME")
+  ...
+  bwrap_args+=("${env_args[@]}" --unsetenv WSL_INTEROP --unsetenv WSLENV)
+  bwrap_args+=(--unshare-all --share-net --die-with-parent --chdir "$cwd" "$codex_bin" "$@")</code></pre>
+        <figcaption>Excerpt from <code>bin/codex-sandbox</code>, lines 218 to 229 and 288 to 289.</figcaption>
+      </figure>
+      <p>Bubblewrap applies the mount operations in the order given. The empty tmpfs on <code>$HOME</code> is mounted first. The binds of the root, tool and state paths that lie under <code>$HOME</code> are placed on top of it, and the <code>/dev/null</code> overmounts come last.</p>
+      <p>The README's dry run prints the full command, one argument per line. The output below comes from a throwaway home directory with the config shown. Arguments are joined per operation, and the throwaway path is written as <code>$HOME</code>.</p>
+      <pre><code># $HOME/.config/agent-controls/sandbox.conf
+rw ~/src/my-app
+ro ~/src/vendor-library
+ro ~/src/governed-repo docs src tools
+tool ~/tools/node
+state ~/.codex
+unsetenv GH_TOKEN
+mask *.pem
+
+$ cd $HOME/src/my-app
+$ CODEX_SANDBOX_DRY_RUN=1 codex-sandbox exec "list the files"
+bwrap
+  --ro-bind /usr /usr
+  --ro-bind-try /bin /bin
+  --ro-bind-try /sbin /sbin
+  --ro-bind-try /lib /lib
+  --ro-bind-try /lib64 /lib64
+  --ro-bind /etc /etc
+  --tmpfs /mnt
+  --ro-bind-try &lt;resolv.conf target&gt; &lt;resolv.conf target&gt;
+  --proc /proc
+  --dev /dev
+  --tmpfs /tmp
+  --tmpfs /home
+  --tmpfs $HOME
+  --ro-bind $HOME/tools/node $HOME/tools/node
+  --bind $HOME/.codex $HOME/.codex
+  --bind $HOME/src/my-app $HOME/src/my-app
+  --ro-bind /dev/null $HOME/src/my-app/certs/server.pem
+  --ro-bind /dev/null $HOME/src/my-app/api/.env.local
+  --ro-bind /dev/null $HOME/src/my-app/.env
+  --unsetenv GH_TOKEN
+  --unsetenv WSL_INTEROP
+  --unsetenv WSLENV
+  --unshare-all --share-net --die-with-parent
+  --chdir $HOME/src/my-app
+  $HOME/tools/node/bin/codex exec "list the files"</code></pre>
+      <p>Only <code>$HOME/src/my-app</code> appears. <code>vendor-library</code> and <code>governed-repo</code> are configured roots and are not bound in this session. Started from <code>$HOME/src/governed-repo</code>, the same config binds <code>docs</code>, <code>src</code> and <code>tools</code> read-only and turns <code>exec</code> into <code>exec --skip-git-repo-check</code>, because that root's <code>.git</code> is absent.</p>
+      <aside class="note">
+        <p>Excerpt: <code>bin/codex-sandbox</code> lines 218 to 229 and 288 to 289 at <code>fb209b2</code>. Dry run variable: lines 290 to 293. <code>--skip-git-repo-check</code>: lines 285 to 287.</p>
+        <p>Dry-run command: <code>README.md</code> line 133. Run on 2026-10-28 with <code>HOME</code> set to a new temporary directory, <code>CODEX_BIN</code> set to the stand-in from <code>tests/test_codex_sandbox.py</code> line 19, and the config at the default path from line 262.</p>
+        <p>On the WSL2 machine used here, the resolv.conf target was a file under <code>/mnt/wsl</code>, the one bind under <code>/mnt</code>.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Refusal outside every root</h2>
+      <p>The wrapper decides whether to start before it builds any bubblewrap argument. <code>find_root</code> compares the physical current directory (<code>pwd -P</code>) with every configured root and returns the longest root that contains it. Roots are resolved with <code>readlink -f</code> when the config is read, so a symbolic link to a directory is compared by its target.</p>
+      <p>When no root matches, the wrapper prints the configured roots and exits 1. No namespace is created and Codex does not start:</p>
+      <pre><code>$ cd $HOME/elsewhere &amp;&amp; codex-sandbox exec x
+codex-sandbox: $HOME/elsewhere is outside every configured root ($HOME/src/my-app $HOME/src/vendor-library $HOME/src/governed-repo); cd into one, or set CODEX_UNCONFINED=1 to bypass</code></pre>
+      <p>Four further checks stop the wrapper with exit 1:</p>
+      <ol>
+        <li>The current directory is inside a subtree root but outside its listed subtrees. Started in <code>governed-repo/confidential</code>, the message was <code>... is inside $HOME/src/governed-repo but outside its bound subtrees: docs src tools</code>.</li>
+        <li>The Codex executable, or the target of its symbolic link, is outside every bound path. A <code>tool</code> line for its install directory fixes this.</li>
+        <li>The config names <code>/</code> as a root, gives subtrees to an <code>rw</code> root, or gives a subtree that is absolute or contains <code>..</code>.</li>
+        <li>The config file is missing, has an unknown keyword or a relative path, or leaves no usable root.</li>
+      </ol>
+      <p>A configured root that is not a directory is skipped with a warning; the remaining roots still apply.</p>
+      <aside class="note">
+        <p><code>bin/codex-sandbox</code> at <code>fb209b2</code>: <code>find_root</code> lines 161 to 172; <code>pwd -P</code> line 269; refusal lines 271 to 273; <code>die</code> exits 1 at lines 54 to 57; <code>readlink -f</code> line 91.</p>
+        <p>Checks 1 to 4: lines 255 to 257; 281 to 284; 92 to 98; 77, 143, 150 and 158. Skipped root: lines 87 to 90.</p>
+        <p>Messages: captured 2026-10-28 from runs in a throwaway home directory, path written as <code>$HOME</code>.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>What a process inside the namespace sees</h2>
+      <p>For this article the wrapper was also run outside dry-run mode, in the throwaway home directory from the previous section, with the stand-in Codex from the test suite. The stand-in runs its first argument as a shell command. Results on 2026-10-28:</p>
+      <ul>
+        <li><code>cat</code> of a file outside the root: <code>No such file or directory</code>, exit 1.</li>
+        <li><code>cat .env</code> in the root: <code>Permission denied</code>, exit 1. <code>ls -l .env</code> lists the name as a character device. The file's name stays visible; its content does not.</li>
+        <li><code>ls -A /</code>: 11 entries: <code>bin dev etc home lib lib64 mnt proc sbin tmp usr</code>. <code>/run</code> and <code>/init</code> are absent.</li>
+        <li><code>ls -A $HOME</code>: <code>.codex</code>, <code>src</code> and <code>tools</code>, the bound <code>state</code> path and the parents of the bound root and <code>tool</code> path. A planted <code>$HOME/.ssh/id_test</code> did not exist.</li>
+        <li><code>ls -A /mnt</code>: <code>wsl</code> only, the parent of the bound resolv.conf target.</li>
+        <li>With <code>WSL_INTEROP</code>, <code>WSLENV</code> and <code>GH_TOKEN</code> set in the calling environment, all three were unset inside. A fourth variable, with no <code>unsetenv</code> line, passed through.</li>
+        <li>In a subtree root, <code>ls -A</code> listed <code>docs src tools</code>, and <code>touch docs/x</code> failed with <code>Read-only file system</code>.</li>
+        <li><code>/proc</code> listed 4 process IDs inside the namespace and 196 on the host in the same run. The process kept the caller's user ID.</li>
+      </ul>
+      <p>Inference: <code>cat .env</code> fails instead of returning an empty file because bubblewrap's <code>--ro-bind</code> does not grant device access on the mount it creates, so the <code>/dev/null</code> device node cannot be opened there. The threat model states the observed result: reads of a masked file fail.</p>
+      <aside class="note">
+        <p>Runs: 2026-10-28, WSL2 kernel 6.18.33.2-microsoft-standard-WSL2, bubblewrap 0.9.0, a new temporary <code>HOME</code>, stand-in Codex from <code>tests/test_codex_sandbox.py</code> line 19. No directory outside the temporary tree was bound.</p>
+        <p>Counts 11, 4 and 196: <code>ls -A /</code> and <code>ls /proc | grep -c '^[0-9]'</code> inside and outside the namespace, one run each.</p>
+        <p>Masked reads fail: <code>docs/threat-model.md</code> line 48.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Tests by area</h2>
+      <p><code>tests/test_codex_sandbox.py</code> has 23 test functions. One is parametrized over 4 config errors, so pytest collects 26 cases. 21 cases call the wrapper with <code>CODEX_SANDBOX_DRY_RUN=1</code> and check the bwrap argument list. 5 cases start the stand-in Codex in a real namespace and check what it can reach. The grouping into areas below is mine.</p>
+      <figure class="chart" data-chart="sandbox-tests-by-area"></figure>
+      <table>
+        <thead><tr><th>Area</th><th>What the cases check</th></tr></thead>
+        <tbody>
+          <tr><td>Root selection and binding</td><td>An <code>rw</code> root is bound read-write and set as the working directory. An <code>ro</code> root is bound read-only. The longest matching root wins. In a namespace: a file outside the root does not exist, a write to an <code>ro</code> root fails, a write to an <code>rw</code> root succeeds.</td></tr>
+          <tr><td>Config errors</td><td>Unknown keyword, relative path, <code>setenv</code> with one argument, <code>/</code> as a root, missing config file.</td></tr>
+          <tr><td>Subtree roots</td><td>Only the listed subtrees are bound and <code>exec</code> gets <code>--skip-git-repo-check</code>. Refusal in an unlisted subdirectory. Subtrees on an <code>rw</code> root and subtrees containing <code>..</code> are rejected.</td></tr>
+          <tr><td>Secret file masking</td><td><code>.env</code> and <code>.env.local</code> are masked and copies under <code>node_modules</code> and <code>.venv</code> are skipped. <code>mask *.pem</code> adds a pattern. In a namespace: the content of <code>.env</code> does not reach standard output.</td></tr>
+          <tr><td>Empty HOME and /tmp, WSL routes</td><td>tmpfs on <code>/tmp</code>, <code>/home</code> and <code>$HOME</code>. tmpfs on <code>/mnt</code>, <code>WSL_INTEROP</code> and <code>WSLENV</code> unset, no bind sourced from <code>/init</code>, <code>/run</code>, <code>/mnt</code> or <code>/</code>. In a namespace: a planted <code>.ssh</code> is absent from <code>$HOME</code>, <code>/mnt</code> holds nothing other than <code>wsl</code>, and <code>/init</code> is absent.</td></tr>
+          <tr><td>Startup refusals</td><td>Refusal outside every root. Refusal when the Codex executable is outside every bound path.</td></tr>
+          <tr><td>Codex binary lookup and bypass</td><td><code>CODEX_UNCONFINED=1</code> runs the binary directly. The <code>PATH</code> lookup skips the wrapper itself.</td></tr>
+          <tr><td>State, tool and environment lines</td><td>A <code>state</code> directory is created and bound read-write, a <code>tool</code> path is bound read-only, <code>setenv</code> expands <code>~/</code>, <code>unsetenv</code> is passed through.</td></tr>
+        </tbody>
+      </table>
+      <p>The repository's suite collects 72 cases in 4 files: 26 for the sandbox, 28 for the review gate, 13 for <code>claude_profile</code> and 5 link checks. The README's figure of 67 control tests excludes the link checks. On 2026-10-28 all 72 passed on the WSL2 machine used for this article, and none was skipped, so the 5 namespace cases ran. The namespace cases skip where bubblewrap cannot create a namespace. CI installs bubblewrap on Ubuntu 24.04 and turns off the AppArmor restriction on unprivileged user namespaces so that they run there.</p>
+      <aside class="note">
+        <p>Counts: <code>uvx pytest --collect-only -q</code> at <code>fb209b2</code>, 2026-10-28: 72 collected. Per file: 26, 28, 13, 5. Function count: 23 <code>def test_</code> lines in <code>tests/test_codex_sandbox.py</code>; the parametrized one is at lines 234 to 247.</p>
+        <p>21 and 5, and 67: <code>README.md</code> lines 15 and 108; <code>docs/data.json</code> lines 15 to 63.</p>
+        <p>Pass result: <code>uvx pytest -q -p no:cacheprovider -rs</code> with a new temporary <code>HOME</code>, 72 passed, pytest 9.2.0. Documented command: <code>README.md</code> line 122.</p>
+        <p>Skip condition: <code>tests/test_codex_sandbox.py</code> lines 23 to 30. CI: <code>.github/workflows/ci.yml</code> lines 12 and 16 to 25.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Threats addressed and not addressed</h2>
+      <p>The threat model covers a Linux or WSL2 workstation where Codex runs as the developer's own user and, without controls, can read every file that user can read. The rows below are its entries for <code>codex-sandbox</code>.</p>
+      <table>
+        <thead><tr><th>Threat</th><th>Addressed</th><th>Mechanism or reason</th></tr></thead>
+        <tbody>
+          <tr><td>T1: reads outside the working root</td><td>Yes</td><td>Only the configured root containing the current directory is bound. The wrapper refuses to start outside every root.</td></tr>
+          <tr><td>T1: reads of dotfiles in <code>$HOME</code></td><td>Yes</td><td><code>/tmp</code>, <code>/home</code> and <code>$HOME</code> are empty tmpfs mounts. Only <code>tool</code> and <code>state</code> paths are bound back.</td></tr>
+          <tr><td>T1: partial access to a governed repository</td><td>Yes</td><td><code>ro &lt;root&gt; &lt;subtree&gt;...</code> binds the listed subtrees only. <code>.git</code> is absent, so history of unlisted directories is unreachable.</td></tr>
+          <tr><td>T2: <code>.env</code> files inside the root</td><td>Yes</td><td>Regular files named <code>.env*</code> or matching a <code>mask</code> pattern are overmounted with <code>/dev/null</code>, except inside the five pruned directories listed under Masking below.</td></tr>
+          <tr><td>T2: credentials in environment variables</td><td>Named ones</td><td><code>unsetenv</code> lines remove the variables they name.</td></tr>
+          <tr><td>Writes to a reference repository</td><td>Yes</td><td><code>ro</code> roots are read-only binds.</td></tr>
+          <tr><td>WSL: Windows drives, the interop socket</td><td>Yes</td><td><code>/mnt</code> is an empty tmpfs and <code>/run</code> is absent, except for the resolv.conf target when it lies under one of them. <code>/init</code> is absent. <code>WSL_INTEROP</code> and <code>WSLENV</code> are unset.</td></tr>
+          <tr><td>WSL: Windows executables through binfmt_misc</td><td>Untested</td><td><code>/init</code> is absent. The effect depends on the interop handler's registration flags, which were not checked.</td></tr>
+          <tr><td>Network egress</td><td>No</td><td>The network is shared because the Codex API needs it. Anything in the bound root can be sent anywhere the machine can reach.</td></tr>
+          <tr><td>Environment variables in general</td><td>No</td><td>The calling shell's environment passes through, except <code>WSL_INTEROP</code>, <code>WSLENV</code> and <code>unsetenv</code> entries.</td></tr>
+          <tr><td>Secrets under other names</td><td>No</td><td>Masking matches regular file names at start. Other names, files created after launch, symbolic links and files in the pruned directories are not masked.</td></tr>
+          <tr><td>Everything that is bound</td><td>No</td><td>The root, every <code>tool</code> path and every <code>state</code> path are visible. <code>~/.codex</code>, which holds Codex's own credentials, is usually a read-write <code>state</code> path. <code>/etc</code> is bound read-only in full.</td></tr>
+          <tr><td>Bypass</td><td>No</td><td><code>CODEX_UNCONFINED=1</code>, or the real Codex binary run by its absolute path, skips the namespace.</td></tr>
+          <tr><td>Other agents</td><td>No</td><td>Claude Code is not confined by this wrapper. It has its own permission system.</td></tr>
+          <tr><td>Malicious local user, kernel or bubblewrap exploits, compromised Codex binary</td><td>Out of scope</td><td>Listed as out of scope for the repository as a whole.</td></tr>
+        </tbody>
+      </table>
+      <aside class="note">
+        <p>Source: <code>docs/threat-model.md</code> at <code>fb209b2</code>. Setting: line 7. Threat IDs: lines 18 to 25. Addressed rows: lines 43 to 51, each with its test name. Not addressed: lines 57 to 63, the binfmt_misc entry at line 60. Out of scope: line 27.</p>
+        <p>The same limits in the README: lines 182 to 186.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Limits</h2>
+      <h3>WSL</h3>
+      <ul>
+        <li>The Windows drives are hidden by the tmpfs on <code>/mnt</code>. The resolv.conf target is bound back as one read-only file so that DNS resolves. If that target lies under <code>/run</code> on another setup, that one path under <code>/run</code> exists in the namespace.</li>
+        <li>The test for WSL entry points checks that <code>/init</code> is absent and that <code>/mnt</code> holds nothing besides <code>wsl</code>. No test runs a Windows executable from inside the namespace.</li>
+        <li>Inference (untested): if the WSL interop handler is registered with the binfmt_misc <code>F</code> flag, the kernel keeps the interpreter open from registration, and an absent <code>/init</code> would not by itself stop a Windows executable placed in the bound root from reaching it. The unset <code>WSL_INTEROP</code> and the absent <code>/run</code> would then be the remaining barriers. The registration flags were not checked for this article. The threat model lists the same question as untested.</li>
+      </ul>
+      <h3>Codex's own sandbox modes</h3>
+      <ul>
+        <li>The probe covered <code>--sandbox read-only</code>. The repository records nothing about the other Codex sandbox modes.</li>
+        <li>The wrapper passes Codex's arguments through unchanged, except that it adds <code>--skip-git-repo-check</code> to <code>exec</code> in a subtree root. A <code>--sandbox</code> flag therefore still applies, inside the namespace. The repository has no test of Codex's own sandbox running inside bubblewrap.</li>
+        <li>The Codex CLI version in the probe is unknown, so the probe does not show whether current versions still read outside the working directory in read-only mode.</li>
+      </ul>
+      <h3>What bubblewrap does not isolate in this configuration</h3>
+      <ul>
+        <li>The network: <code>--share-net</code> keeps the host network namespace.</li>
+        <li>The user: the process runs with the caller's user ID, and writes in an <code>rw</code> root or a <code>state</code> path land on the host.</li>
+        <li>System calls and resources: the argument list has no <code>--seccomp</code> filter and sets no CPU or memory limit.</li>
+        <li>The terminal: the argument list has no <code>--new-session</code>, which <code>bwrap --help</code> describes as "Create a new terminal session", so Codex keeps the caller's controlling terminal. Whether the running kernel permits terminal input injection was not checked.</li>
+        <li>The kernel and bubblewrap themselves, which the threat model places out of scope.</li>
+      </ul>
+      <h3>Masking</h3>
+      <ul>
+        <li>Masks are computed once, at start, from file names. A secret in a differently named file, a file created later, or a symbolic link stays readable.</li>
+        <li>The search for masked files prunes <code>node_modules</code>, <code>.git</code>, <code>.venv</code>, <code>venv</code> and <code>__pycache__</code>. A <code>.env</code> file inside one of them is not masked. In the 2026-10-28 run, <code>node_modules/pkg/.env</code> was readable inside the namespace. The script header, the threat model and the README list the pruned directories.</li>
+        <li>Masks apply to the bound root only. <code>tool</code> and <code>state</code> paths are not searched.</li>
+      </ul>
+      <h3>Bypass and setup</h3>
+      <ul>
+        <li><code>CODEX_UNCONFINED=1</code> is checked before the config is read, so it works from any directory. Run from outside every root with it set, the stand-in Codex could see <code>/init</code>.</li>
+        <li>The wrapper confines Codex only when it is the <code>codex</code> found first on <code>PATH</code>. The real binary run by its absolute path is not confined.</li>
+        <li>The namespace needs unprivileged user namespaces. Ubuntu 24.04 restricts them through AppArmor by default.</li>
+      </ul>
+      <aside class="note">
+        <p><code>bin/codex-sandbox</code> at <code>fb209b2</code>: resolv.conf lines 223 to 228; pass-through and <code>--share-net</code> line 289; <code>--skip-git-repo-check</code> lines 285 to 287; prune list line 43; mask search lines 198 to 214 and 279; header statement of the mask and the pruning lines 20 to 23; <code>CODEX_UNCONFINED</code> lines 265 to 267.</p>
+        <p>WSL test: <code>tests/test_codex_sandbox.py</code> lines 322 to 335. Pruning is intended: lines 165 to 175.</p>
+        <p><code>docs/threat-model.md</code>: masking line 48 and 59; out of scope line 27; bypass line 62. <code>README.md</code>: <code>PATH</code> order line 131; Codex version line 182; pruned directories line 184.</p>
+        <p>AppArmor: <code>.github/workflows/ci.yml</code> lines 19 to 25. <code>--new-session</code> and <code>--seccomp</code>: <code>bwrap --help</code>, bubblewrap 0.9.0.</p>
+      </aside>
+    </section>
+
+    <section>
+      <h2>Run it</h2>
+      <p>Requirements from the README: bash 4.4 or later, git, Python 3.10 or later, uv, and bubblewrap. The test suite needs no Codex install; it uses a stand-in.</p>
+      <pre><code>git clone https://github.com/darblinko/agent-controls
+cd agent-controls
+uvx pytest -q
+
+mkdir -p ~/.config/agent-controls
+cp examples/sandbox.conf ~/.config/agent-controls/sandbox.conf   # edit roots and tool paths
+cd $HOME/project                                                 # a configured root
+CODEX_SANDBOX_DRY_RUN=1 /path/to/agent-controls/bin/codex-sandbox exec "list the files"</code></pre>
+      <p>The dry run, like a real run, needs a Codex executable: the next <code>codex</code> on <code>PATH</code> or <code>CODEX_BIN</code>, inside a <code>tool</code> path from the config. The README installs the wrapper as a <code>codex</code> link placed before the real Codex on <code>PATH</code>. The repository's landing page is at <a href="https://darblinko.github.io/agent-controls/">darblinko.github.io/agent-controls</a>, and the source, threat model and tests are in <a href="https://github.com/darblinko/agent-controls">darblinko/agent-controls</a>.</p>
+      <aside class="note">
+        <p>Requirements: <code>README.md</code> line 117. Commands: lines 119 to 135, with the install link at line 131.</p>
+        <p>Codex lookup and the bound-path check: <code>bin/codex-sandbox</code> lines 183 to 196 and 281 to 284.</p>
+      </aside>
+    </section>
+  </main>
+
+  <footer>
+    Text and figures CC BY 4.0. Figures generated from <code>data.json</code> in this directory.
+  </footer>
+
+  <script src="../../assets/charts.js" defer></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+    const dark = document.documentElement.dataset.theme === "dark" ||
+      (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+    mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral",
+      fontFamily: "IBM Plex Sans, system-ui, sans-serif", securityLevel: "strict" });
+  </script>
+</body>
+</html>

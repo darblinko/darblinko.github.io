@@ -1,0 +1,147 @@
+{
+  "meta": {
+    "repo": "darblinko.github.io",
+    "revision": "draft",
+    "measured": "2026-10-28"
+  },
+  "charts": [
+    {
+      "name": "totals",
+      "type": "stats",
+      "title": "Totals in the two local records",
+      "subtitle": "Claude Code 2026-04-15 to 2026-10-08; Codex CLI 2026-04-26 to 2026-10-26",
+      "source": "Claude Code local stats cache (dailyActivity, summed); Codex CLI session file names, counted",
+      "alt": "10,202 Claude Code sessions, 282,405 messages, 167,392 tool calls, 2,195 Codex session files.",
+      "tiles": [
+        {
+          "label": "Claude Code sessions",
+          "value": "10,202",
+          "note": "134 active days of 177"
+        },
+        {
+          "label": "Claude Code messages",
+          "value": "282,405",
+          "note": "median 1,452 per active day"
+        },
+        {
+          "label": "Claude Code tool calls",
+          "value": "167,392",
+          "note": "0.59 per message"
+        },
+        {
+          "label": "Codex CLI session files",
+          "value": "2,195",
+          "note": "131 active days"
+        }
+      ]
+    },
+    {
+      "name": "cc-fortnight-messages",
+      "type": "line",
+      "title": "Claude Code messages per two-week period",
+      "subtitle": "Periods start on Mondays from 2026-04-13; data runs 2026-04-15 to 2026-10-08",
+      "source": "Claude Code local stats cache, dailyActivity.messageCount summed over 14-day periods",
+      "alt": "Two-week message totals range from 4,427 to 41,284; the peak is the period starting 2026-05-25.",
+      "format": "number",
+      "x": [
+        "Apr 13",
+        "Apr 27",
+        "May 11",
+        "May 25",
+        "Jun 8",
+        "Jun 22",
+        "Jul 6",
+        "Jul 20",
+        "Aug 3",
+        "Aug 17",
+        "Aug 31",
+        "Sep 14",
+        "Sep 28"
+      ],
+      "series": [
+        {
+          "name": "Messages",
+          "values": [
+            4764,
+            38925,
+            20673,
+            41284,
+            7707,
+            4427,
+            13755,
+            15939,
+            31771,
+            31978,
+            39586,
+            17899,
+            13697
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cc-monthly-sessions",
+      "type": "columns",
+      "title": "Claude Code sessions per month",
+      "subtitle": "April starts 2026-04-15; October ends 2026-10-08",
+      "source": "Claude Code local stats cache, dailyActivity.sessionCount summed by calendar month",
+      "alt": "August holds 7,345 of 10,202 sessions.",
+      "format": "number",
+      "categories": [
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct"
+      ],
+      "series": [
+        {
+          "name": "Sessions",
+          "values": [
+            12,
+            799,
+            681,
+            1078,
+            7345,
+            189,
+            98
+          ]
+        }
+      ]
+    },
+    {
+      "name": "codex-monthly-files",
+      "type": "columns",
+      "title": "Codex CLI session files per month",
+      "subtitle": "Grouped by the date in the file path; 2026-04-26 to 2026-10-26",
+      "source": "Codex CLI local session directory, file names counted by the year and month in the path",
+      "alt": "June holds 946 of 2,195 session files.",
+      "format": "number",
+      "categories": [
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct"
+      ],
+      "series": [
+        {
+          "name": "Session files",
+          "values": [
+            5,
+            305,
+            946,
+            580,
+            154,
+            110,
+            95
+          ]
+        }
+      ]
+    }
+  ]
+}
