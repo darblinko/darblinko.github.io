@@ -26,7 +26,7 @@
         <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
         <div><dt>Topic</dt><dd>Enterprise: regulated quality</dd></div>
         <div><dt>Source</dt><dd><a href="https://github.com/darblinko/golden-goose">darblinko/golden-goose</a></dd></div>
-        <div><dt>Revision</dt><dd><code>3654d96</code></dd></div>
+        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/golden-goose/tree/3654d96fd34fcc0eaf691dfb1e85fa5cc2d3846c"><code>3654d96</code></a></dd></div>
       </dl>
     </section>
 
@@ -156,7 +156,7 @@ flowchart TD
       </table></div>
       <p>The 4 misroutes, QA-0206 to QA-0209, are governance and clinical questions that ask for a CAPA count within a management review period. The count phrasing sends them to the aggregate tool, and the routing table excludes aggregate for this pattern because the answer must come from the review record. A comment in the routing eval states that the gate is not relaxed to hide this misroute. By computation from the gate, the 90% floor would still pass with up to 21 misroutes out of 216.</p>
       <p>No per-pattern recall gate exists. Supplier questions reach 14.3% recall@10 over 7 questions and seeded defect discovery 71.4% over 7, while the 80% gate applies to the mean over 207. The project page plots recall by pattern.</p>
-      <p>The offline test suite at <code>3654d96</code> reported 884 passed, 33 deselected and 1 expected failure. The deselected tests carry the integration or external markers. The expected failure is the strict xfail described under the limits below.</p>
+      <p>A local run of the offline test suite at <code>3654d96</code> reported 884 passed, 33 deselected and 1 expected failure. The repository does not record this count; it is as reported from that run. The deselected tests carry the integration or external markers. The expected failure is the strict xfail described under the limits below.</p>
       <aside class="note">
         <p>Run: <code>docs/results/run-seed42.txt</code> lines 1 to 2, 7, 10, 13, 19 and 31. Report: <code>docs/results/eval-battery-seed42.json</code>; gated values at lines 5, 81 to 84 and 89; noise at lines 113 to 120; leaks line 65; failures line 121; MRR and nDCG lines 6 and 7; skips lines 66 to 76.</p>
         <p>Skip rate 9 / 216 = 0.0417 and routing 212 / 216 = 0.9815, computed. 21 misroutes give 195 / 216 = 0.903; 22 give 0.898.</p>

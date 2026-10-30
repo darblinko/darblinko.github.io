@@ -29,7 +29,7 @@
         <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
         <div><dt>Topic</dt><dd>Quant trading research</dd></div>
         <div><dt>Source</dt><dd><a href="https://github.com/darblinko/llm-trading-lab">darblinko/llm-trading-lab</a></dd></div>
-        <div><dt>Revision</dt><dd><code>78e7b53</code></dd></div>
+        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/llm-trading-lab/tree/78e7b53fa4c9678a0b0292c86547b76019618322"><code>78e7b53</code></a></dd></div>
       </dl>
     </section>
 
@@ -141,7 +141,7 @@ flowchart TD
 
     <section>
       <h2>Resample alignment: which fix still reads a later close</h2>
-      <p>The skill in <a href="https://github.com/darblinko/claude-skills/tree/main/skills/ts-ml-lookahead-audit">claude-skills</a> gives two fixes for the bucket pattern. <code>bucket_last_safe</code> shifts the leaky bucket value by one bucket's worth of rows within the trading day. <code>bucket_last_safe_with_gaps</code> takes the previous bucket's last value per day. <code>examples/lookahead_demo.py</code> runs the functions as written in <code>SKILL.md</code> and counts the bars whose feature is a close recorded after the bar.</p>
+      <p>The skill in <a href="https://github.com/darblinko/claude-skills/tree/85d2aeee439891c8b65329e222274d2f32f8efb9/skills/ts-ml-lookahead-audit">claude-skills</a> gives two fixes for the bucket pattern. <code>bucket_last_safe</code> shifts the leaky bucket value by one bucket's worth of rows within the trading day. <code>bucket_last_safe_with_gaps</code> takes the previous bucket's last value per day. <code>examples/lookahead_demo.py</code> runs the functions as written in <code>SKILL.md</code> and counts the bars whose feature is a close recorded after the bar.</p>
       <figure class="chart" data-chart="resample-future-reads"></figure>
       <p>On gapless 1-minute bars the leaky pattern reads a later close on 4 of every 5 bars. The row-count shift reads none on 1-minute bars with or without gaps. On 30-second bars a 5-row shift covers 2.5 minutes, lands inside the current bucket, and reads a later close on 40% of bars; <code>SKILL.md</code> states this limit beside the function. The previous-bucket variant reads none in all three conditions. llm-trading-lab's <code>previous_bucket_last</code> uses the same previous-bucket rule.</p>
       <p>The skill's correlation audit, run on 10 synthetic sessions with two planted leaks, flags <code>peek_3m</code> (|r| 0.773) and <code>bucket_gap_leaky</code> (0.647). It passes the row-shift bucket feature (0.016) and the 1-minute return (0.006).</p>

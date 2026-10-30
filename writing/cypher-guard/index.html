@@ -26,7 +26,7 @@
         <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
         <div><dt>Topic</dt><dd>Agent engineering</dd></div>
         <div><dt>Source</dt><dd><a href="https://github.com/Nysara-Global-LLC/cypher-guard">Nysara-Global-LLC/cypher-guard</a></dd></div>
-        <div><dt>Revision</dt><dd><code>657c31f</code></dd></div>
+        <div><dt>Revision</dt><dd><a href="https://github.com/Nysara-Global-LLC/cypher-guard/tree/657c31f14252e26ec752862b0b9a69d011462e93"><code>657c31f</code></a></dd></div>
       </dl>
     </section>
 
@@ -169,7 +169,7 @@ RETURN a.title</code></pre>
       <figure class="chart" data-chart="corpus-summary"></figure>
       <p><code>benchmarks/rule_coverage.py</code> runs every corpus row through <code>validate_read_query</code>. An adversarial row passes when the guard raises the code the row expects; a valid row passes when the guard accepts it. The report also counts how many of the 16 codes in <code>errors.py</code> at least one row raises. A test and the CI workflow fail when the committed report differs from a fresh run.</p>
       <figure class="chart" data-chart="rejections-by-code"></figure>
-      <p>Four codes are raised by one row each. The valid rows also check the rewrite: each must end in <code>LIMIT 100</code>. On 2026-10-28 at <code>eb95150</code>, <code>rule_coverage.py --check</code> exited 0 and the test suite reported 174 passed. The suite includes the test that compares <code>benchmarks/baseline.json</code> with a fresh run against <code>502b403</code>.</p>
+      <p>Four codes are raised by one row each. The valid rows also check the rewrite: each must end in <code>LIMIT 100</code>. On 2026-10-28 at <code>eb95150</code>, <code>rule_coverage.py --check</code> exited 0 and a local run of the test suite reported 174 passed. The repository does not record the test count; it is as reported from that run. The suite includes the test that compares <code>benchmarks/baseline.json</code> with a fresh run against <code>502b403</code>.</p>
       <aside class="note">
         <p>Report: <code>benchmarks/rule_coverage.json</code> lines 6 to 16 and 17 to 114; generator <code>benchmarks/rule_coverage.py</code> lines 29 to 62 and 92 to 97. Codes: <code>src/cypher_guard/errors.py</code> lines 21 to 36.</p>
         <p>Staleness checks: <code>tests/test_rule_coverage.py</code> lines 15 to 28; <code>.github/workflows/ci.yml</code> line 37. Baseline test: <code>tests/test_baseline.py</code> lines 33 to 35.</p>

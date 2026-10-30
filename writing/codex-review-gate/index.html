@@ -26,7 +26,7 @@
         <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
         <div><dt>Topic</dt><dd>Agent engineering</dd></div>
         <div><dt>Source</dt><dd><a href="https://github.com/darblinko/agent-controls">darblinko/agent-controls</a></dd></div>
-        <div><dt>Revision</dt><dd><code>fb209b2</code></dd></div>
+        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/agent-controls/tree/fb209b2a64ab3c12b9e7a4afa0673b5df9fe1ae0"><code>fb209b2</code></a></dd></div>
       </dl>
       <figure class="chart" data-chart="gate-figures"></figure>
     </section>
@@ -227,7 +227,7 @@ flowchart TD
 
     <section>
       <h2>What the tests cover</h2>
-      <p>pytest collects 72 tests at <code>fb209b2</code>, and all 72 pass. 28 are in <code>tests/test_review_gate.py</code>, 26 in <code>tests/test_codex_sandbox.py</code>, 13 in <code>tests/test_claude_profiles.py</code> and 5 in <code>tests/test_links.py</code>. Each gate test builds a throwaway git repository and replaces Codex with a stub that records the prompt it receives and returns a fixed verdict.</p>
+      <p>pytest collects 72 tests at <code>fb209b2</code>, and all 72 passed in a local run on 2026-10-28 (as reported from that run; <code>docs/data.json</code> line 19 at that revision records "of 72 in tests/, all pass"). 28 are in <code>tests/test_review_gate.py</code>, 26 in <code>tests/test_codex_sandbox.py</code>, 13 in <code>tests/test_claude_profiles.py</code> and 5 in <code>tests/test_links.py</code>. Each gate test builds a throwaway git repository and replaces Codex with a stub that records the prompt it receives and returns a fixed verdict.</p>
       <figure class="chart" data-chart="tests-by-area"></figure>
       <p>No test covers these behaviors: deletion of the previous review on a batch change, untracked files over 51,200 bytes, a batch change caused by staging, and the real Codex CLI. The README lists the same four as untested. Inference: the stub returns JSON that matches the schema, so the tests do not show how often Codex itself returns a verdict the gate can parse.</p>
       <aside class="note">

@@ -30,7 +30,7 @@
         <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
         <div><dt>Topic</dt><dd>Agent engineering</dd></div>
         <div><dt>Source</dt><dd><a href="https://github.com/darblinko/agent-controls">darblinko/agent-controls</a></dd></div>
-        <div><dt>Revision</dt><dd><code>fb209b2</code></dd></div>
+        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/agent-controls/tree/fb209b2a64ab3c12b9e7a4afa0673b5df9fe1ae0"><code>fb209b2</code></a></dd></div>
         <div><dt>Codex CLI version in the probe</dt><dd>Not recorded</dd></div>
       </dl>
     </section>
@@ -228,7 +228,7 @@ codex-sandbox: $HOME/elsewhere is outside every configured root ($HOME/src/my-ap
           <tr><td>State, tool and environment lines</td><td>A <code>state</code> directory is created and bound read-write, a <code>tool</code> path is bound read-only, <code>setenv</code> expands <code>~/</code>, <code>unsetenv</code> is passed through.</td></tr>
         </tbody>
       </table>
-      <p>The repository's suite collects 72 cases in 4 files: 26 for the sandbox, 28 for the review gate, 13 for <code>claude_profile</code> and 5 link checks. The README's figure of 67 control tests excludes the link checks. On 2026-10-28 all 72 passed on the WSL2 machine used for this article, and none was skipped, so the 5 namespace cases ran. The namespace cases skip where bubblewrap cannot create a namespace. CI installs bubblewrap on Ubuntu 24.04 and turns off the AppArmor restriction on unprivileged user namespaces so that they run there.</p>
+      <p>The repository's suite collects 72 cases in 4 files: 26 for the sandbox, 28 for the review gate, 13 for <code>claude_profile</code> and 5 link checks. The README's figure of 67 control tests excludes the link checks. On 2026-10-28 all 72 passed in a local run on the WSL2 machine used for this article (as reported from that run; <code>docs/data.json</code> line 19 at <code>fb209b2</code> records "of 72 in tests/, all pass"), and none was skipped, so the 5 namespace cases ran. The namespace cases skip where bubblewrap cannot create a namespace. CI installs bubblewrap on Ubuntu 24.04 and turns off the AppArmor restriction on unprivileged user namespaces so that they run there.</p>
       <aside class="note">
         <p>Counts: <code>uvx pytest --collect-only -q</code> at <code>fb209b2</code>, 2026-10-28: 72 collected. Per file: 26, 28, 13, 5. Function count: 23 <code>def test_</code> lines in <code>tests/test_codex_sandbox.py</code>; the parametrized one is at lines 234 to 247.</p>
         <p>21 and 5, and 67: <code>README.md</code> lines 15 and 108; <code>docs/data.json</code> lines 15 to 63.</p>
