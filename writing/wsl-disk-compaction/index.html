@@ -106,12 +106,16 @@ wsl.exe -d &lt;distro&gt; -u root -- docker ps</code></pre>
         </li>
         <li>
           <p><strong>Optional: exclude the distro directory from Microsoft Defender.</strong> Administrator. The notes' reasoning: Defender cannot read ext4 contents, and the block changes that compaction produces trigger a full rescan of a file estimated at about 250 GB.</p>
-          <p>The exclusion persists until it is removed. The script below records whether the path was already excluded, adds it only if it was not, and step 9 removes only an exclusion added here. The record and the removal are additions by this article; the notes add the exclusion and do not remove it.</p>
+          <p>The exclusion persists until it is removed. The script below records whether the path was already excluded, adds it only if it was not, and step 9 removes only an exclusion added here. The record is written once: when step 4 is run again after a failed or interrupted run, the existing record is kept, so a retry does not mistake the exclusion added by the first attempt for one that existed before the procedure. The record and the removal are additions by this article; the notes add the exclusion and do not remove it.</p>
           <pre><code>$work = "$env:USERPROFILE\wsl-compact"
 $localState = "$env:LOCALAPPDATA\Packages\&lt;distro package&gt;\LocalState"
-$alreadyExcluded = @((Get-MpPreference).ExclusionPath) -contains $localState
-Set-Content -Path "$work\defender-exclusion.txt" -Value $(if ($alreadyExcluded) { 'PREEXISTING' } else { 'ADDED' })
-if (-not $alreadyExcluded) { Add-MpPreference -ExclusionPath $localState }
+$record = "$work\defender-exclusion.txt"
+$excluded = @((Get-MpPreference).ExclusionPath) -contains $localState
+if (-not (Test-Path -LiteralPath $record)) {
+  Set-Content -Path $record -Value $(if ($excluded) { 'PREEXISTING' } else { 'ADDED' })
+}
+if (-not $excluded) { Add-MpPreference -ExclusionPath $localState }
+Get-Content -Path $record
 (Get-MpPreference).ExclusionPath</code></pre>
         </li>
         <li>
@@ -160,12 +164,16 @@ Stop-Transcript</code></pre>
 wsl.exe -d &lt;distro&gt; -u root -- docker start &lt;container&gt;
 wsl.exe -d &lt;distro&gt; -u root -- docker logs --tail 30 &lt;container&gt;</code></pre>
           <p>Success: <code>FS_OK</code> prints, used space matches step 2, and the container log shows a clean start. Then re-enable the WSL extension and restore <code>window.restoreWindows</code>.</p>
-          <p>If step 4 ran, remove the exclusion it added. Administrator. A path that was excluded before step 4 stays excluded.</p>
-          <pre><code>$work = "$env:USERPROFILE\wsl-compact"
+          <p>If step 4 ran, remove the exclusion it added. Administrator. A path that was excluded before step 4 stays excluded. The record is deleted only after the exclusion list shows the intended state, so the next run of the procedure starts with a new record; if the removal fails, the record stays and this block can be run again.</p>
+          <pre><code>$ErrorActionPreference = 'Stop'
+$work = "$env:USERPROFILE\wsl-compact"
 $localState = "$env:LOCALAPPDATA\Packages\&lt;distro package&gt;\LocalState"
-if ((Get-Content -Path "$work\defender-exclusion.txt") -eq 'ADDED') {
-  Remove-MpPreference -ExclusionPath $localState
-}
+$record = "$work\defender-exclusion.txt"
+$added = (Get-Content -Path $record) -eq 'ADDED'
+if ($added) { Remove-MpPreference -ExclusionPath $localState }
+$excluded = @((Get-MpPreference).ExclusionPath) -contains $localState
+if ($added -and $excluded) { throw "exclusion is still present: $localState" }
+Remove-Item -LiteralPath $record
 (Get-MpPreference).ExclusionPath</code></pre>
         </li>
       </ol>
