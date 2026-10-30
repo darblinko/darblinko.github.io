@@ -46,7 +46,7 @@ Every chart needs `name`, `type`, `title` and `source`. `subtitle` and `alt` are
 | line | `x: [...]`, `series: [{name, values}]`; optional `min`, `max` | `null` breaks the line. An observation with no neighbour is drawn as a dot. The end marker and end label use the last non-null value. A series with no values draws nothing and still appears in the legend and table. |
 | stats | `tiles: [{label, value, note?}]`; `value` is a preformatted string | Not applicable. |
 
-`format` is `percent` (fractions, 0.86 prints 86%), `number` (default), `decimal2` or `decimal3`. Each `values` array has one entry per `x` or `categories` entry. At most 4 series are drawn; charts.js ignores any after the fourth, and the checks reject them. A chart that fails to draw shows its own error and leaves the other charts on the page in place; a failed data.json fetch shows the error in every figure.
+`format` is `percent` (fractions, 0.86 prints 86%), `number` (default), `decimal2` or `decimal3`. Each `values` array has one entry per `x` or `categories` entry. At most 4 series are drawn; charts.js ignores any after the fourth, and the checks reject them. Values, `max`, `min` and `threshold.value` must be finite numbers (`null` where the table allows it), an hbar row needs a string `label`, and an explicit `max` on hbar and columns charts must be positive; charts.js and the checks reject anything else. An hbar or columns chart whose values are all 0 is drawn on a 0 to 1 axis. A chart that fails to draw shows its own error and leaves the other charts on the page in place; a failed data.json fetch or malformed inline JSON shows the error in every figure.
 
 ## License
 
