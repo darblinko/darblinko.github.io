@@ -100,7 +100,7 @@
           <p class="eyebrow">Retrieval and evaluation</p>
           <h3>golden-goose</h3>
           <p>Agentic RAG for medical device audit support, with revision-aware retrieval, SQL and graph routing, and a hash-chained audit log.</p>
-          <p class="evidence">The recorded evaluation run passed all seven metric gates, with 94.4% recall at 10 and 98.1% routing accuracy.</p>
+          <p class="evidence">One recorded run on a synthetic corpus, with fake LLM, embedding, reranker and OCR providers, passed all seven metric gates, with 94.4% recall at 10 and 98.1% routing accuracy. Answer quality from a hosted LLM was not measured.</p>
           <div class="links">
             <a href="https://darblinko.github.io/golden-goose/" aria-label="Results for golden-goose">Results</a>
             <a href="https://github.com/darblinko/golden-goose" aria-label="Source for golden-goose">Source</a>
@@ -122,8 +122,9 @@
           <figure class="figure">
             <picture>
               <source srcset="/assets/projects/golden-goose-dark.svg" media="(prefers-color-scheme: dark)">
-              <img src="/assets/projects/golden-goose-light.svg" width="760" height="338" loading="lazy" alt="Bar chart of evaluation metrics against their gates. All seven gated metrics pass: recall at 10 94.4%, grounded answer rate 100%, routing accuracy 98.1%, citation recall 83.3%, citation precision 70.5%, sentence support 58.9%.">
+              <img src="/assets/projects/golden-goose-light.svg" width="760" height="338" loading="lazy" alt="Bar chart of evaluation metrics against their gates for one seed-42 run on a synthetic corpus with fake providers. All seven gated metrics pass: recall at 10 94.4%, grounded answer rate 100% (citation presence only, entailment not judged), routing accuracy 98.1%, citation recall 83.3%, citation precision 70.5%, sentence support 58.9%.">
             </picture>
+            <figcaption>Seed-42 run at golden-goose 055e6fe on the generated synthetic corpus, with fake LLM, embedding, reranker and OCR providers. The grounded rate checks that each answer carries a citation marker that resolves to retrieved evidence; with the fake generator it does not judge whether the answer is supported. Source: golden-goose docs/results/ and README.</figcaption>
           </figure>
         </div>
       </article>
