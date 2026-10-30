@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>62 of 83 prompt changes state a test that could prove them wrong</title>
+  <title>62 of 83 prompt change records contain the falsifier keyword</title>
   <meta name="description" content="The prompt change record format in llm-trading-lab (before, after, diff, rationale with trigger, expected change and falsifier, and a changelog link), why each field exists, and how complete 83 recorded changes are by the repository's own convention checks.">
   <link rel="icon" href="data:,">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,13 +26,13 @@
 
   <main class="article">
     <section class="intro">
-      <h1>62 of 83 prompt changes state a test that could prove them wrong</h1>
-      <p class="lede">In llm-trading-lab a prompt change is recorded as the text before, the text after, their diff, and a rationale that names the trigger, the expected behavior change and the observation that would show the change was wrong. Across 83 records written from May to October 2026, 95.2% have all four files, 74.7% state a falsifier and 63.9% state an expected change, the lowest of seven checks; each check looks for a keyword, so the shares measure the form of the records and do not show whether any test was run.</p>
+      <h1>62 of 83 prompt change records contain the falsifier keyword</h1>
+      <p class="lede">In llm-trading-lab a prompt change is recorded as the text before, the text after, their diff, and a rationale that names the trigger, the expected behavior change and the observation that would show the change was wrong. Across 83 records written from May to October 2026, 95.2% have all four files, 74.7% contain the string "falsif" and 63.9% contain "expected", the lowest of seven checks. The three rationale checks are keyword searches, and the unfilled template passes all three, so these shares measure the form of the records. They do not show that a falsifier was written or that any test was run.</p>
       <dl class="record">
         <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
         <div><dt>Topic</dt><dd>Quant trading: LLM operations</dd></div>
         <div><dt>Source</dt><dd><a href="https://github.com/darblinko/llm-trading-lab">darblinko/llm-trading-lab</a></dd></div>
-        <div><dt>Revision</dt><dd><code>78e7b53</code></dd></div>
+        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/llm-trading-lab/tree/78e7b53fa4c9678a0b0292c86547b76019618322"><code>78e7b53</code></a></dd></div>
       </dl>
       <aside class="note">
         <p>83 records, May to October: <code>data/results/prompt_history_by_month.csv</code> rows 2 to 6 sum to 83.</p>
@@ -43,7 +43,7 @@
 
     <section>
       <h2>Scope: one package, one export, no prompt text</h2>
-      <p>llm-trading-lab is research tooling for LLM trading agents. Its <a href="https://darblinko.github.io/llm-trading-lab/">project page</a> covers the whole repository: the call gate, the walk-forward runner, the leakage audit and the negative results. This article covers one package, <a href="https://github.com/darblinko/llm-trading-lab/tree/main/src/prompt_history"><code>src/prompt_history/</code></a>, which writes a change record for each prompt edit, validates a tree of records against the convention, and counts how many records pass each check.</p>
+      <p>llm-trading-lab is research tooling for LLM trading agents. Its <a href="https://darblinko.github.io/llm-trading-lab/">project page</a> covers the whole repository: the call gate, the walk-forward runner, the leakage audit and the negative results. This article covers one package, <a href="https://github.com/darblinko/llm-trading-lab/tree/78e7b53fa4c9678a0b0292c86547b76019618322/src/prompt_history"><code>src/prompt_history/</code></a>, which writes a change record for each prompt edit, validates a tree of records against the convention, and counts how many records pass each check.</p>
       <p>The counts come from one run of <code>python -m prompt_history index</code> on the prompt history and changelog of a private research repository at revision <code>27c1a59</code> (2026-10-21). The export holds counts only. The private tree cannot be regenerated from the public repository, and records written after that revision are not counted.</p>
       <p>Neither the repository nor this article contains live prompt text. The one example record in the repository is fictional, and this article does not reproduce its prompt snapshots.</p>
       <aside class="note">
@@ -113,7 +113,7 @@ flowchart TD
     </section>
 
     <section>
-      <h2>Measured completeness of the 83 records</h2>
+      <h2>Convention check results for the 83 records</h2>
       <p>Each check is a rule in <code>validate.py</code>. The index runs the validator on every record folder and counts the records that show none of the problems belonging to a check.</p>
       <div class="table-wrap wide"><table>
         <thead>
@@ -155,13 +155,13 @@ flowchart TD
     </section>
 
     <section>
-      <h2>What the missing fields mean in practice</h2>
+      <h2>What the failed checks mean in practice</h2>
       <p>Each item below is an inference from the field definitions and the counts. None was checked against the 83 records, whose text is private.</p>
       <ul>
-        <li><strong>No expected change: 30 records (36.1%).</strong> The rationale gives no count to look for in the traces, so the record alone cannot show whether the edited prompt changed what the agent did.</li>
-        <li><strong>No falsifier: 21 records (25.3%).</strong> The record names no observation that would show the change failed. Keeping or reverting the change rests on a judgment that the record does not capture.</li>
-        <li><strong>Both present: between 32 and 53 records.</strong> 53 state an expected change and 62 state a falsifier, so at least 32 state both. The per-record results needed for the exact figure were not exported.</li>
-        <li><strong>No trigger in the rationale: 13 records (15.7%).</strong> Every changelog entry carries a Trigger label, so the trigger for some of these records may sit in the linked changelog entry. The export does not join records to entries, so this is unmeasured.</li>
+        <li><strong>No "expected" keyword: 30 records (36.1%).</strong> The rationale lacks the word, so the template heading was removed or not used. If such a rationale also states no expected change in other words, it gives no count to look for in the traces, and the record alone cannot show whether the edited prompt changed what the agent did.</li>
+        <li><strong>No "falsif" keyword: 21 records (25.3%).</strong> The rationale lacks the word and the template's Falsifier heading. If it also names no failure observation in other words, keeping or reverting the change rests on a judgment that the record does not capture.</li>
+        <li><strong>Both keywords present: between 32 and 53 records.</strong> 53 contain "expected" and 62 contain "falsif", so at least 32 contain both. The per-record results needed for the exact figure were not exported.</li>
+        <li><strong>No "trigger" keyword in the rationale: 13 records (15.7%).</strong> Every changelog entry carries a Trigger label, so the trigger for some of these records may sit in the linked changelog entry. The export does not join records to entries, so this is unmeasured.</li>
         <li><strong>No Validation field: 35 of 127 changelog entries (27.6%).</strong> Those entries do not say how the change was to be validated. The example entry fills the field with paper trading and a reminder to fill Outcome after at least one session.</li>
         <li><strong>Not linked from the changelog: 4 records.</strong> These cannot be found from the changelog by folder name.</li>
         <li><strong>Diff disagrees with snapshots: 3 to 7 records.</strong> A snapshot was edited after the record was written, or the patch was made from different text. The diff then no longer describes the change exactly. The repository's test for this check edits <code>after.md</code> after recording and expects this failure.</li>

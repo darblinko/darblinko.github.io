@@ -7,16 +7,16 @@
       "title": "Prompt change records passing each convention check",
       "subtitle": "83 records, May to October 2026, private tree at 27c1a59",
       "source": "data/results/prompt_history_compliance.csv rows 2 to 8",
-      "alt": "Of 83 records, 72 follow the folder naming convention, 79 have all four files, 76 have a diff that matches the snapshots, 70 name a trigger, 53 state an expected change, 62 state a falsifier and 79 are linked from the changelog.",
+      "alt": "Of 83 records, 72 follow the folder naming convention, 79 have all four files, 76 have a diff that matches the snapshots, 70 contain \"trigger\", 53 contain \"expected\", 62 contain \"falsif\" and 79 are linked from the changelog.",
       "format": "percent",
       "max": 1,
       "data": [
         {"label": "folder name follows convention", "value": 0.8674698795180723, "note": "72 of 83"},
         {"label": "before, after, diff, rationale", "value": 0.9518072289156626, "note": "79 of 83"},
         {"label": "diff matches snapshots", "value": 0.9156626506024096, "note": "76 of 83"},
-        {"label": "rationale names a trigger", "value": 0.8433734939759037, "note": "70 of 83"},
-        {"label": "states expected change", "value": 0.6385542168674698, "note": "53 of 83"},
-        {"label": "states a falsifier", "value": 0.7469879518072289, "note": "62 of 83"},
+        {"label": "rationale contains \"trigger\"", "value": 0.8433734939759037, "note": "70 of 83"},
+        {"label": "rationale contains \"expected\"", "value": 0.6385542168674698, "note": "53 of 83"},
+        {"label": "rationale contains \"falsif\"", "value": 0.7469879518072289, "note": "62 of 83"},
         {"label": "linked from changelog", "value": 0.9518072289156626, "note": "79 of 83"}
       ]
     },
