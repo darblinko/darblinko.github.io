@@ -57,11 +57,12 @@ nav a { display: inline-flex; align-items: center; min-height: 44px; color: var(
 .note { font-size: .9rem; color: var(--muted); }
 .work-note { margin-top: 1.2rem; }
 .figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 4px; }
+.figure video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; }
 .figure figcaption { margin-top: .45rem; font-size: .85rem; color: var(--muted); }
 .proof-grid { display: grid; gap: 1rem; }
 .proof { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr); gap: 1.5rem 2.5rem; padding: 1.5rem; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; }
 .proof-text { min-width: 0; display: flex; flex-direction: column; }
-.proof .figure { align-self: start; }
+.proof-media { min-width: 0; display: grid; gap: 1rem; align-self: start; }
 .proof h3 { margin-block: .55rem .9rem; font-family: "IBM Plex Mono", monospace; font-size: 1.15rem; }
 .proof .evidence { margin-block: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .links { display: flex; flex-wrap: wrap; gap: .25rem 1.1rem; }
@@ -104,6 +105,7 @@ footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5
   .skip, nav { display: none; }
   .hero, .section { padding-block: 1.5rem; }
   .hero, .proof-grid, .proof, .delivery, .contact { display: block; }
-  .snapshot, .proof, .proof .figure { margin-top: 1rem; }
+  .snapshot, .proof, .proof-media { margin-top: 1rem; }
+  .figure video { display: none; }
   article, .timeline li, .more-work li { break-inside: avoid; }
 }
