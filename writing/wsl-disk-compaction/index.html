@@ -199,12 +199,38 @@ Dismount-VHD -Path $vhdx</code></pre>
         <li><p><strong>Find the remaining handle holder</strong> with <code>handle64.exe -accepteula ext4.vhdx</code>, or in Resource Monitor on the CPU tab under Associated Handles.</p></li>
         <li>
           <p><strong>Export and reimport.</strong> This builds a new VHDX that contains only live data. The notes estimate the tar for 140 GiB of live data at roughly 100 GB or more, written to a different physical drive.</p>
-          <pre><code>wsl.exe --shutdown
-wsl.exe --export &lt;distro&gt; "&lt;backup drive&gt;:\&lt;distro&gt;-backup.tar"
-# Stop here. Confirm the tar exists, has a plausible size and is readable.
+          <p>The notes give export, unregister and import as one sequence. Here they are split into two scripts, and the first one stops before anything is deleted. Save each as a <code>.ps1</code> file in <code>%USERPROFILE%\wsl-compact</code> and run it with <code>powershell -NoProfile -File</code>. Run from a file, a <code>throw</code> ends the script. Pasted into a console, the lines can run one at a time, depending on the console, and a failed line then does not stop the lines after it. The exit code checks and the verification import are additions by this article.</p>
+          <p><code>export-verify.ps1</code> exports the distro, checks the export, imports the tar under a second name and starts it. A full backup drive makes <code>wsl --export</code> fail; the script then stops. The verification import needs about as much free space on the backup drive as the distro's live data, in addition to the tar.</p>
+          <pre><code>$ErrorActionPreference = 'Stop'
+$env:WSL_UTF8 = 1
+$work = "$env:USERPROFILE\wsl-compact"
+$tar = "&lt;backup drive&gt;:\&lt;distro&gt;-backup.tar"
+wsl.exe --shutdown
+wsl.exe --export &lt;distro&gt; $tar
+if ($LASTEXITCODE -ne 0) { throw "wsl --export exited with $LASTEXITCODE" }
+$exported = Get-Item -LiteralPath $tar
+if ($exported.Length -le 0) { throw "export file is empty: $tar" }
+wsl.exe --import &lt;distro&gt;-verify "&lt;backup drive&gt;:\&lt;distro&gt;-verify" $tar
+if ($LASTEXITCODE -ne 0) { throw "verification import exited with $LASTEXITCODE" }
+wsl.exe -d &lt;distro&gt;-verify -u root -- df -h /
+if ($LASTEXITCODE -ne 0) { throw "verification distro did not start" }
+wsl.exe --unregister &lt;distro&gt;-verify
+Set-Content -Path "$work\export-verified.txt" -Value $exported.Length
+Write-Output "EXPORT_VERIFIED bytes=$($exported.Length)"</code></pre>
+          <p>Run <code>replace.ps1</code> only after <code>export-verify.ps1</code> printed <code>EXPORT_VERIFIED</code>. It is the destructive step: <code>wsl --unregister</code> deletes the distro and its ext4.vhdx and cannot be undone. The script refuses to run when the verification record is missing or the tar has changed size since it was written.</p>
+          <pre><code>$ErrorActionPreference = 'Stop'
+$env:WSL_UTF8 = 1
+$work = "$env:USERPROFILE\wsl-compact"
+$tar = "&lt;backup drive&gt;:\&lt;distro&gt;-backup.tar"
+$verifiedBytes = [long](Get-Content -Path "$work\export-verified.txt")
+if ((Get-Item -LiteralPath $tar).Length -ne $verifiedBytes) { throw "tar size differs from the verified export" }
+wsl.exe --shutdown
 wsl.exe --unregister &lt;distro&gt;
-wsl.exe --import &lt;distro&gt; "$env:LOCALAPPDATA\Packages\&lt;distro package&gt;\LocalState" "&lt;backup drive&gt;:\&lt;distro&gt;-backup.tar"</code></pre>
-          <p><code>wsl --unregister</code> deletes the distro and cannot be undone. After the import the default user is root. Restore <code>/etc/wsl.conf</code>, keeping the existing <code>[boot]</code> section:</p>
+if ($LASTEXITCODE -ne 0) { throw "wsl --unregister exited with $LASTEXITCODE" }
+wsl.exe --import &lt;distro&gt; "$env:LOCALAPPDATA\Packages\&lt;distro package&gt;\LocalState" $tar
+if ($LASTEXITCODE -ne 0) { throw "wsl --import exited with $LASTEXITCODE; the tar at $tar is the only copy" }
+Write-Output "REIMPORTED"</code></pre>
+          <p>After the import the default user is root. Restore <code>/etc/wsl.conf</code>, keeping the existing <code>[boot]</code> section:</p>
           <pre><code>[boot]
 systemd=true
 
