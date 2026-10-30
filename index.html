@@ -1,127 +1,294 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mitchell Foutz</title>
-  <meta name="description" content="LLM agents for medical device quality, trading research and industrial equipment, measured, constrained and logged before they are trusted with decisions.">
-  <link rel="icon" href="data:,">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap">
-  <link rel="stylesheet" href="assets/site.css">
-  <link rel="stylesheet" href="assets/pages.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Mitchell Foutz builds AI systems and leads engineering teams. Selected work in industrial troubleshooting, regulated quality, agent evaluation and software adoption.">
+<title>Mitchell Foutz | AI engineering and technical leadership</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/home.css">
 </head>
 <body>
-  <header class="site-bar">
-    <a href="./">Mitchell Foutz</a>
-    <span class="site-links"><a href="cv/">CV</a><a href="https://github.com/darblinko">GitHub</a></span>
-  </header>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header wrap">
+  <a class="brand" href="/" aria-current="page">Mitchell Foutz</a>
+  <nav aria-label="Main navigation">
+    <ul>
+      <li><a href="#work">Work</a></li>
+      <li><a href="#public-work">Public projects</a></li>
+      <li><a href="#experience">Experience</a></li>
+      <li><a href="#writing">Writing</a></li>
+      <li><a href="/cv/">CV</a></li>
+    </ul>
+  </nav>
+</header>
+<main id="main" class="wrap" tabindex="-1">
+  <section class="hero" aria-labelledby="intro-title">
+    <div>
+      <p class="eyebrow">AI engineer and technical co-founder</p>
+      <h1 id="intro-title">I build AI systems and lead the teams that deliver them.</h1>
+      <p class="intro">I'm Mitchell Foutz, an engineer in Los Angeles. I build LLM agents, retrieval pipelines and the controls around them for industrial operations and regulated quality. My work spans Python implementation, architecture, evaluation and team leadership.</p>
+      <p class="meta">B.S. Biomedical Engineering, Cal Poly San Luis Obispo. PMP.</p>
+      <div class="actions">
+        <a class="button primary" href="mailto:mitch@nysara.ai">Email Mitchell</a>
+        <a class="button" href="/cv/">View full CV</a>
+      </div>
+    </div>
+    <dl class="snapshot" aria-label="Selected leadership experience">
+      <div>
+        <dt>Engineering team built and led</dt>
+        <dd>8 people<span>AI/ML, cloud and industrial IoT</span></dd>
+      </div>
+      <div>
+        <dt>Quality organization growth</dt>
+        <dd>11 to 50<span>staff across three facilities</span></dd>
+      </div>
+    </dl>
+  </section>
 
-  <main>
-    <section class="intro">
-      <h1>Mitchell Foutz</h1>
-      <p class="lede">I build LLM agents for medical device quality, trading research and industrial equipment. I measure them, constrain them and log what they do before they are trusted with decisions.</p>
-      <dl class="record">
-        <div><dt>Role</dt><dd>AI systems engineer</dd></div>
-        <div><dt>Background</dt><dd>B.S. Biomedical Engineering, PMP</dd></div>
-        <div><dt>Domains</dt><dd>FDA-regulated quality, trading research, industrial IoT</dd></div>
-        <div><dt>Code</dt><dd><a href="https://github.com/darblinko">github.com/darblinko</a></dd></div>
-      </dl>
-    </section>
+  <section id="work" class="section" aria-labelledby="work-title">
+    <div class="section-head">
+      <p class="eyebrow">Selected delivery</p>
+      <h2 id="work-title">AI systems, teams and operating workflows.</h2>
+    </div>
+    <article class="delivery">
+      <div>
+        <p class="eyebrow">Industrial maintenance</p>
+        <h3>Equipment troubleshooting grounded in context</h3>
+      </div>
+      <div>
+        <p>I own the technical strategy and architecture for an industrial maintenance AI startup. Its assistant combines equipment telemetry, technical documentation, hybrid retrieval and a Neo4j knowledge graph to guide troubleshooting.</p>
+        <p>I built and led an 8-person AI/ML, cloud and IoT team, taking the platform from prototype through production architecture.</p>
+      </div>
+    </article>
+    <article class="delivery">
+      <div>
+        <p class="eyebrow">Regulated quality</p>
+        <h3>Medical devices under design controls</h3>
+      </div>
+      <div>
+        <p>At Pro-Dex, I led new product development of battery-powered, sterilizable arthroscopic surgical tools with embedded firmware, under 21 CFR 820 and EU MDR 2017/745 design controls.</p>
+        <p>I led DHF and CE technical file remediation for legacy product families, and for a neurostimulation device startup I set up the eQMS and design controls and prepared the FDA submission.</p>
+      </div>
+    </article>
+    <article class="delivery">
+      <div>
+        <p class="eyebrow">Software adoption</p>
+        <h3>Systems that reach the teams using them</h3>
+      </div>
+      <div>
+        <p>At Better Nutritionals, I led NetSuite ERP, RF-Smart WMS and Qualio eQMS implementations, including training, change management and phased rollout.</p>
+        <p>I grew QA from 11 to 50 staff across three facilities and created its SOPs and training programs.</p>
+      </div>
+    </article>
+    <p class="note work-note">Startup and client names are omitted where the company has not agreed to be named.</p>
+  </section>
 
-    <section class="method" id="method">
-      <h2>Method</h2>
-      <p>The projects below cover three domains. Each one applies the same five rules to the LLM components in it.</p>
+  <section id="public-work" class="section" aria-labelledby="public-title">
+    <div class="section-head">
+      <p class="eyebrow">Public engineering</p>
+      <h2 id="public-title">Inspect the code and the evidence.</h2>
+      <p>These projects show how I evaluate models, constrain agent actions and record results. Each figure is taken from the project's own results page, which states the revision and date of its numbers.</p>
+    </div>
+    <div class="proof-grid">
+      <article class="proof">
+        <div class="proof-text">
+          <p class="eyebrow">Retrieval and evaluation</p>
+          <h3>golden-goose</h3>
+          <p>Agentic RAG for medical device audit support, with revision-aware retrieval, SQL and graph routing, and a hash-chained audit log.</p>
+          <p class="evidence">The recorded evaluation run passed all seven metric gates, with 94.4% recall at 10 and 98.1% routing accuracy.</p>
+          <div class="links">
+            <a href="/golden-goose/" aria-label="Results for golden-goose">Results</a>
+            <a href="https://github.com/darblinko/golden-goose" aria-label="Source for golden-goose">Source</a>
+          </div>
+        </div>
+        <figure class="figure">
+          <picture>
+            <source srcset="/assets/projects/golden-goose-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="/assets/projects/golden-goose-light.svg" width="760" height="338" loading="lazy" alt="Bar chart of evaluation metrics against their gates. All seven gated metrics pass: recall at 10 94.4%, grounded answer rate 100%, routing accuracy 98.1%, citation recall 83.3%, citation precision 70.5%, sentence support 58.9%.">
+          </picture>
+        </figure>
+      </article>
+      <article class="proof">
+        <div class="proof-text">
+          <p class="eyebrow">Query validation</p>
+          <h3>cypher-guard</h3>
+          <p>Checks model-written Cypher for read-only access and tenant scope before it reaches the database.</p>
+          <p class="evidence">The first version accepted 19 queries that read another tenant's data. The revised checker rejects all 19.</p>
+          <div class="links">
+            <a href="https://nysara-global-llc.github.io/cypher-guard/" aria-label="Results for cypher-guard">Results</a>
+            <a href="https://github.com/Nysara-Global-LLC/cypher-guard" aria-label="Source for cypher-guard">Source</a>
+          </div>
+        </div>
+        <figure class="figure">
+          <picture>
+            <source srcset="/assets/projects/cypher-guard-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="/assets/projects/cypher-guard-light.svg" width="760" height="678" loading="lazy" alt="Bar chart of adversarial queries rejected, by error code. unscoped_alias rejects 32, parse_error 7, varlen_intermediate_unscoped 6, pattern_comprehension_rejected and varlen_depth 5 each; 11 other codes reject 1 to 4 each.">
+          </picture>
+        </figure>
+      </article>
+      <article class="proof">
+        <div class="proof-text">
+          <p class="eyebrow">Developer tooling</p>
+          <h3>agent-controls</h3>
+          <p>Codex sandboxing with bubblewrap, cross-agent review and per-profile Claude Code configuration.</p>
+          <p class="evidence">A Stop-hook gate runs tests and a second coding agent review, capped at two rounds. The original gate has 34 logged verdicts.</p>
+          <div class="links">
+            <a href="/agent-controls/" aria-label="Results for agent-controls">Results</a>
+            <a href="https://github.com/darblinko/agent-controls" aria-label="Source for agent-controls">Source</a>
+          </div>
+        </div>
+        <figure class="figure">
+          <picture>
+            <source srcset="/assets/projects/agent-controls-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="/assets/projects/agent-controls-light.svg" width="760" height="270" loading="lazy" alt="Bar chart of tests per control: review gate 28, sandbox arguments 21, claude_profile 13, sandbox namespace runs 5, all passing.">
+          </picture>
+        </figure>
+      </article>
+    </div>
 
-      <h3>Models are measured before they are selected</h3>
-      <ul>
-        <li><a href="https://github.com/darblinko/golden-goose">golden-goose</a> gates each eval run on retrieval recall, grounded-answer rate, citation recall and precision, sentence support and routing accuracy.</li>
-        <li><a href="https://github.com/darblinko/llm-trading-lab">llm-trading-lab</a> validates its screening model over 21 walk-forward folds and audits its features for look-ahead leaks.</li>
-      </ul>
+    <h3 class="subhead">More engineering work</h3>
+    <ul class="more-work">
+      <li>
+        <figure class="figure">
+          <picture>
+            <source srcset="/assets/projects/obd-scanner-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="/assets/projects/obd-scanner-light.svg" width="760" height="174" loading="lazy" alt="Field test on a 2017 Infiniti Q50 3.0t, 2026-10-17: 13 modules answered, 3 stored codes, 0 broadcast frames, and the decoded EPS angle correlated at -1.00 with the ABS steering angle.">
+          </picture>
+        </figure>
+        <strong>obd-scanner</strong>
+        <p>Vehicle diagnostics through 18 typed tools and a pre-tool-use guard.</p>
+        <div class="links"><a href="/obd-scanner/" aria-label="Results for obd-scanner">Results</a><a href="https://github.com/darblinko/obd-scanner" aria-label="Source for obd-scanner">Source</a></div>
+      </li>
+      <li>
+        <figure class="figure">
+          <picture>
+            <source srcset="/assets/projects/industrial-monitor-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="/assets/projects/industrial-monitor-light.svg" width="760" height="270" loading="lazy" alt="Bar chart of detection rate per fault class: imbalance 86.5%, bearing wear 99.3%, temperature drift 98.5%, all faults 94.8%.">
+          </picture>
+        </figure>
+        <strong>industrial-monitor</strong>
+        <p>Vibration monitoring over MQTT with FFT and envelope anomaly detection, and a maintenance assistant that cites its sources.</p>
+        <div class="links"><a href="/industrial-monitor/" aria-label="Results for industrial-monitor">Results</a><a href="https://github.com/darblinko/industrial-monitor" aria-label="Source for industrial-monitor">Source</a></div>
+      </li>
+      <li>
+        <figure class="figure">
+          <picture>
+            <source srcset="/assets/projects/cb_explorer-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="/assets/projects/cb_explorer-light.svg" width="760" height="194" loading="lazy" alt="Self scan of the cb_explorer package: 998 symbols indexed, 7,462 graph edges, 23.74% of 5,808 CALLS edges resolved, 151 findings.">
+          </picture>
+        </figure>
+        <strong>cb_explorer</strong>
+        <p>Python call graphs, pinned analyzers, SARIF and a read-only MCP server.</p>
+        <div class="links"><a href="https://nysara-global-llc.github.io/cb_explorer/" aria-label="Results for cb_explorer">Results</a><a href="https://github.com/Nysara-Global-LLC/cb_explorer" aria-label="Source for cb_explorer">Source</a></div>
+      </li>
+      <li>
+        <figure class="figure">
+          <img src="/assets/projects/pbi-portfolio.webp" width="1400" height="788" loading="lazy" alt="Quality Overview page of the device quality dashboard: six KPI cards with trend lines, complaint counts by quarter, a complaint category donut and a failure mode by product matrix.">
+          <figcaption>Device quality dashboard, Quality Overview page.</figcaption>
+        </figure>
+        <strong>pbi-portfolio</strong>
+        <p>Four dashboards that reproduce Power BI report features in vanilla JavaScript.</p>
+        <div class="links"><a href="/pbi-portfolio/" aria-label="Results for pbi-portfolio">Results</a><a href="https://github.com/darblinko/pbi-portfolio" aria-label="Source for pbi-portfolio">Source</a></div>
+      </li>
+      <li>
+        <figure class="figure">
+          <img src="/assets/projects/claude-skills.webp" width="1360" height="748" loading="lazy" alt="Top of a PDF page produced by the markdown-to-pdf skill: a running header, a three-row table and a mermaid flowchart rendered as a diagram.">
+          <figcaption>markdown-to-pdf output for its test fixture, page 1.</figcaption>
+        </figure>
+        <strong>claude-skills</strong>
+        <p>Claude Code skills for Markdown to PDF, EC2 training runs and look-ahead bias audits.</p>
+        <div class="links"><a href="/claude-skills/" aria-label="Results for claude-skills">Results</a><a href="https://github.com/darblinko/claude-skills" aria-label="Source for claude-skills">Source</a></div>
+      </li>
+      <li>
+        <figure class="figure">
+          <picture>
+            <source srcset="/assets/projects/llm-trading-lab-dark.svg" media="(prefers-color-scheme: dark)">
+            <img src="/assets/projects/llm-trading-lab-light.svg" width="760" height="378" loading="lazy" alt="Bar chart of model accuracy with and without two look-ahead leaks: 72.5 to 74.4% with the leaks, 49.8 to 50.8% after the fix.">
+          </picture>
+        </figure>
+        <strong>llm-trading-lab</strong>
+        <p>Walk-forward validation, leakage audits and recorded negative results.</p>
+        <div class="links"><a href="/llm-trading-lab/" aria-label="Results for llm-trading-lab">Results</a><a href="https://github.com/darblinko/llm-trading-lab" aria-label="Source for llm-trading-lab">Source</a></div>
+      </li>
+    </ul>
+  </section>
 
-      <h3>Outputs carry provenance or an audit record</h3>
-      <ul>
-        <li>golden-goose keeps a hash-chained, append-only audit log and retrieves documents by revision as of a date.</li>
-        <li>llm-trading-lab records each prompt change as before, after, diff and rationale; 95.2% of the records have all four, and 74.7% state a falsifier.</li>
-      </ul>
+  <section id="experience" class="section" aria-labelledby="experience-title">
+    <div class="section-head">
+      <p class="eyebrow">Experience</p>
+      <h2 id="experience-title">Engineering across software, devices and operations.</h2>
+      <p>My startup and consulting roles run concurrently.</p>
+    </div>
+    <ol class="timeline">
+      <li>
+        <p class="period">Dec 2024 to present</p>
+        <div><h3>CTO and technical co-founder</h3><p>Industrial maintenance AI startup. Technical strategy, architecture and engineering leadership.</p></div>
+      </li>
+      <li>
+        <p class="period">2024 to present</p>
+        <div><h3>Principal consultant and technical program lead</h3><p>Thunderbird Engineering Inc. AI development, technical program delivery and regulatory planning for medical device, manufacturing and trading clients.</p><p>Built and deployed trading software with Python, FastAPI and LangGraph on AWS ECS, SQS and EventBridge.</p></div>
+      </li>
+      <li>
+        <p class="period">Jan 2022 to Jan 2024</p>
+        <div><h3>Senior project engineer, Pro-Dex</h3><p>Led development of Class II surgical tools, design controls and technical file remediation under FDA and EU MDR requirements.</p></div>
+      </li>
+      <li>
+        <p class="period">Jul 2020 to Jan 2022</p>
+        <div><h3>Technical project manager and quality manager, Better Nutritionals</h3><p>Quality leadership, audit preparation and ERP, WMS and eQMS implementation.</p></div>
+      </li>
+    </ol>
+    <div class="credentials">
+      <p>Earlier work includes biomedical engineering at Logos Systems International and construction project management at Ecostone.</p>
+      <p><strong>Core tools:</strong> Python, FastAPI, LangGraph, Neo4j, SQL, AWS and Databricks.</p>
+      <p><strong>Education:</strong> B.S. Biomedical Engineering, Cal Poly San Luis Obispo, 2010.</p>
+      <p><strong>Certification:</strong> Project Management Professional (PMP), Feb 2025 to Feb 2028.</p>
+      <p><a href="/cv/">Full experience, client work and technical areas</a></p>
+    </div>
+  </section>
 
-      <h3>Deterministic code owns what must be exact</h3>
-      <ul>
-        <li>golden-goose routes count and trace questions to SQL or graph queries instead of the model.</li>
-        <li><a href="https://github.com/Nysara-Global-LLC/cypher-guard">cypher-guard</a> checks LLM-generated Cypher against tenant-scoping rules before it reaches the database.</li>
-        <li><a href="https://github.com/darblinko/obd-scanner">obd-scanner</a> blocks agent writes outside the project, raw serial-port access and secret-file reads with a pre-tool-use hook.</li>
-      </ul>
+  <section id="writing" class="section" aria-labelledby="writing-title">
+    <div class="section-head">
+      <p class="eyebrow">Writing</p>
+      <h2 id="writing-title">Implementation notes and recorded limits.</h2>
+    </div>
+    <ul class="writing-list">
+      <li><span class="draft">Draft</span><a href="/writing/golden-goose-evals/">Evaluating an agentic RAG system for regulatory audit support</a></li>
+      <li><span class="draft">Draft</span><a href="/writing/cypher-guard/">Checking LLM-generated Cypher before it reaches a multi-tenant graph</a></li>
+      <li><span class="draft">Draft</span><a href="/writing/codex-review-gate/">A coding-agent review gate capped at two rounds</a></li>
+      <li><span class="draft">Draft</span><a href="/writing/car-diagnostic-agent/">An AI agent that talks to my car over KWP2000 and UDS</a></li>
+      <li><span class="draft">Draft</span><a href="/writing/trading-agents-no-edge/">My LLM trading agents found no edge, and how I know</a></li>
+      <li><span class="draft">Draft</span><a href="/writing/lookahead-audit-checklist/">Look-ahead bias in time-series ML: an audit checklist</a></li>
+      <li><span class="draft">Draft</span><a href="/writing/prompt-change-records/">62 of 83 prompt changes state a test that could prove them wrong</a></li>
+      <li><span class="draft">Draft</span><a href="/writing/codex-bubblewrap-sandbox/">Sandboxing Codex CLI with bubblewrap on WSL</a></li>
+      <li><span class="draft">Draft</span><a href="/writing/agent-session-counts/">Ten thousand coding-agent sessions: what the counts show</a></li>
+      <li><span class="draft">Draft</span><a href="/writing/wsl-disk-compaction/">Why trimming does not shrink a WSL disk</a></li>
+    </ul>
+  </section>
 
-      <h3>Agents are checked by other agents or by sandboxes</h3>
-      <ul>
-        <li><a href="https://github.com/darblinko/agent-controls">agent-controls</a> runs a second coding agent as a reviewer at the end of every session, capped at two rounds, and confines Codex CLI to named directories with bubblewrap.</li>
-        <li>llm-trading-lab ships two review apps that replay a synthetic two-agent trading session, in which an entry needs both agents to agree.</li>
-      </ul>
-
-      <h3>Negative results are recorded</h3>
-      <ul>
-        <li>llm-trading-lab reports the strategies that showed no edge and the setup families that failed their first validation stage.</li>
-      </ul>
-    </section>
-
-    <section id="projects">
-      <h2>Projects</h2>
-      <table class="project-table">
-        <thead><tr><th>Project</th><th>Domain</th><th>What it shows</th><th>Links</th></tr></thead>
-        <tbody>
-          <tr><td>golden-goose</td><td>Regulated quality</td><td>Agentic RAG for medical device audit support, with evaluation gates and an audit log</td><td class="links"><a href="https://github.com/darblinko/golden-goose">Source</a><a href="https://darblinko.github.io/golden-goose/">Page</a></td></tr>
-          <tr><td>pbi-portfolio</td><td>Regulated quality</td><td>Four dashboards that reproduce Power BI report features in vanilla JavaScript, on seeded fictional data</td><td class="links"><a href="https://github.com/darblinko/pbi-portfolio">Source</a><a href="https://darblinko.github.io/pbi-portfolio/">Page</a></td></tr>
-          <tr><td>agent-controls</td><td>Agent engineering</td><td>Codex sandbox, cross-agent review gate, per-profile Claude Code configuration</td><td class="links"><a href="https://github.com/darblinko/agent-controls">Source</a><a href="https://darblinko.github.io/agent-controls/">Page</a></td></tr>
-          <tr><td>claude-skills</td><td>Agent engineering</td><td>Claude Code skills: Markdown to PDF, EC2 training runs, look-ahead bias audit</td><td class="links"><a href="https://github.com/darblinko/claude-skills">Source</a><a href="https://darblinko.github.io/claude-skills/">Page</a></td></tr>
-          <tr><td>cypher-guard</td><td>Agent engineering</td><td>Static checks on LLM-generated Cypher for a multi-tenant graph</td><td class="links"><a href="https://github.com/Nysara-Global-LLC/cypher-guard">Source</a><a href="https://nysara-global-llc.github.io/cypher-guard/">Page</a></td></tr>
-          <tr><td>cb_explorer</td><td>Tooling</td><td>Deterministic Python code analysis: call graph, pinned analyzers, SARIF and a read-only MCP server</td><td class="links"><a href="https://github.com/Nysara-Global-LLC/cb_explorer">Source</a><a href="https://nysara-global-llc.github.io/cb_explorer/">Page</a></td></tr>
-          <tr><td>llm-trading-lab</td><td>Trading research</td><td>LLM trading agents, walk-forward validation, leakage audits and recorded negative results</td><td class="links"><a href="https://github.com/darblinko/llm-trading-lab">Source</a><a href="https://darblinko.github.io/llm-trading-lab/">Page</a></td></tr>
-          <tr><td>pegasus-serverless</td><td>Trading research</td><td>Serverless trading infrastructure on AWS</td><td class="links"><a href="https://github.com/darblinko/pegasus-serverless">Source</a><a href="https://darblinko.github.io/pegasus-serverless/">Page</a></td></tr>
-          <tr><td>premium-selling</td><td>Trading research</td><td>Same-day SPY option spread system on AWS Lambda, Step Functions and DynamoDB</td><td class="links"><a href="https://github.com/darblinko/premium-selling">Source</a><a href="https://darblinko.github.io/premium-selling/">Page</a></td></tr>
-          <tr><td>obd-scanner</td><td>Industrial IoT</td><td>An agent that reads vehicle diagnostics over KWP2000 and UDS behind a guard hook</td><td class="links"><a href="https://github.com/darblinko/obd-scanner">Source</a><a href="https://darblinko.github.io/obd-scanner/">Page</a></td></tr>
-          <tr><td>industrial-monitor</td><td>Industrial IoT</td><td>Simulated vibration sensors over MQTT, FFT and envelope anomaly detection, and a maintenance assistant that cites a synthetic manual corpus</td><td class="links"><a href="https://github.com/darblinko/industrial-monitor">Source</a><a href="https://darblinko.github.io/industrial-monitor/">Page</a></td></tr>
-        </tbody>
-      </table>
-      <aside class="note">
-        <p>Each project page states the revision and date its figures were measured at.</p>
-      </aside>
-    </section>
-
-    <section id="writing">
-      <h2>Writing</h2>
-      <ul class="writing-list">
-        <li><time datetime="2026-10-28">Draft</time><span><a href="writing/agent-session-counts/">Ten thousand coding-agent sessions: what the counts show</a><span class="summary">Aggregate counts of Claude Code and Codex CLI use from April to October 2026, and what they do not measure.</span></span></li>
-        <li><time datetime="2026-10-28">Draft</time><span><a href="writing/wsl-disk-compaction/">Why trimming does not shrink a WSL disk</a><span class="summary">Discards inside WSL2 stop at the VHDX file; the host space returns only through offline compaction.</span></span></li>
-        <li><time datetime="2026-10-28">Draft</time><span><a href="writing/codex-bubblewrap-sandbox/">Sandboxing Codex CLI with bubblewrap on WSL</a><span class="summary">A mount namespace that holds only the project root, after a probe showed a read-only Codex session reading files outside its working directory.</span></span></li>
-        <li><time datetime="2026-10-28">Draft</time><span><a href="writing/codex-review-gate/">Claude writes, Codex reviews: a Stop-hook review gate capped at two rounds</a><span class="summary">Tests and a Codex review run at every stop; 34 logged verdicts from the original gate, by round.</span></span></li>
-        <li><time datetime="2026-10-28">Draft</time><span><a href="writing/car-diagnostic-agent/">An AI agent that talks to my car over KWP2000 and UDS</a><span class="summary">The agent calls 18 typed tools and never opens the serial port; one session on a 2017 Q50 found 13 modules and 3 stored codes.</span></span></li>
-        <li><time datetime="2026-10-28">Draft</time><span><a href="writing/golden-goose-evals/">Evaluating an agentic RAG system for regulatory audit support</a><span class="summary">Seven metric gates on a synthetic quality system; the seed-42 run passed all of them, and its grounded rate was measured with a fake generator.</span></span></li>
-        <li><time datetime="2026-10-28">Draft</time><span><a href="writing/prompt-change-records/">62 of 83 prompt changes state a test that could prove them wrong</a><span class="summary">Each prompt change is stored as before, after, diff and rationale; 95.2% of 83 records have all four files, and the rationale checks look only for keywords.</span></span></li>
-        <li><time datetime="2026-10-28">Draft</time><span><a href="writing/trading-agents-no-edge/">My LLM trading agents found no edge, and how I know</a><span class="summary">0 of 8 swing setup families and 0 of 6 entry models passed their gates; signals the LLM approved were direction-correct on 45.9% of 37, against 49.6% of the 115 it rejected.</span></span></li>
-        <li><time datetime="2026-10-28">Draft</time><span><a href="writing/lookahead-audit-checklist/">Look-ahead bias in time-series ML: an audit checklist</a><span class="summary">Six look-ahead checks for an intraday ML pipeline; fixing two leaks moved 5-minute classifier accuracy from 74.4% to 49.9%.</span></span></li>
-        <li><time datetime="2026-10-28">Draft</time><span><a href="writing/cypher-guard/">Checking LLM-generated Cypher before it reaches a multi-tenant graph</a><span class="summary">A token-level check keeps model-written Cypher read-only and scoped to one tenant; the first version accepted 19 queries that read another tenant's data, and all 19 are now rejected.</span></span></li>
-      </ul>
-    </section>
-
-    <section id="background">
-      <h2>Background</h2>
-      <table>
-        <tbody>
-          <tr><td>2024 to present</td><td>Principal consultant, Thunderbird Engineering. AI systems for regulated quality, trading and industrial clients.</td></tr>
-          <tr><td>2024 to present</td><td>CTO and technical co-founder, industrial maintenance AI startup.</td></tr>
-          <tr><td>2022 to 2024</td><td>Senior project engineer, Pro-Dex. Class II surgical tools under FDA and EU MDR.</td></tr>
-          <tr><td>2020 to 2022</td><td>Technical project manager and quality manager, Better Nutritionals. QA team grew from 11 to 50.</td></tr>
-          <tr><td>2012 to 2019</td><td>Biomedical engineer, then construction project manager.</td></tr>
-          <tr><td>Education</td><td>B.S. Biomedical Engineering, Cal Poly San Luis Obispo. PMP.</td></tr>
-        </tbody>
-      </table>
-      <p>Full history, client work and technical areas: <a href="cv/">CV</a>.</p>
-    </section>
-  </main>
-
-  <footer>
-    Text and figures CC BY 4.0. Source for this site: <a href="https://github.com/darblinko/darblinko.github.io">darblinko/darblinko.github.io</a>.
-  </footer>
+  <section id="contact" class="section contact" aria-labelledby="contact-title">
+    <div>
+      <p class="eyebrow">Contact</p>
+      <h2 id="contact-title">Discuss a role or a project.</h2>
+    </div>
+    <div>
+      <p>For senior AI engineering, AI architecture and engineering leadership roles, email me or connect on LinkedIn.</p>
+      <p>Consulting inquiries through Thunderbird Engineering are welcome.</p>
+      <div class="links">
+        <a href="mailto:mitch@nysara.ai">mitch@nysara.ai</a>
+        <a href="https://www.linkedin.com/in/mitchellfoutz">LinkedIn</a>
+        <a href="https://github.com/darblinko">GitHub</a>
+      </div>
+    </div>
+  </section>
+</main>
+<footer class="wrap">
+  <p>Mitchell Foutz. Los Angeles.</p>
+  <p>Text and figures: CC BY 4.0. <a href="https://github.com/darblinko/darblinko.github.io">Site source</a>.</p>
+</footer>
 </body>
 </html>

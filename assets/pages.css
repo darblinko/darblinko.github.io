@@ -1,4 +1,4 @@
-/* Additions for the home page and write-ups. Loaded after site.css; uses its tokens. */
+/* Additions for the CV page and write-ups. Loaded after site.css; uses its tokens. */
 
 main table {
   width: 100%;
@@ -15,17 +15,6 @@ main th, main td {
 main th { font-weight: 600; color: var(--ink-2); }
 main td.num, main th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
-.project-table td:first-child { white-space: nowrap; font-weight: 600; }
-.project-table .links a + a { margin-left: 12px; }
-
-.writing-list { list-style: none; padding: 0; }
-.writing-list li { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--rule); margin: 0; }
-.writing-list time { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; padding-top: 2px; }
-.writing-list .summary { display: block; color: var(--ink-2); font-size: 15px; }
-
-.method h3:first-of-type { margin-top: 4px; }
-.method ul { margin-bottom: 6px; }
-
 /* Write-ups: long-form prose in the reading column. */
 .article p, .article li { max-width: 68ch; }
 .article blockquote {
@@ -36,19 +25,6 @@ main td.num, main th.num { text-align: right; font-variant-numeric: tabular-nums
 }
 .article figure.code { margin: 0 0 16px; }
 .article figcaption { font-size: 13px; color: var(--muted); margin-top: -8px; margin-bottom: 16px; }
-
-@media (max-width: 600px) {
-  .writing-list li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
-  /* Each project row stacks: name and links on one line, domain and description below. */
-  .project-table thead { display: none; }
-  .project-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
-  .project-table td { display: block; padding: 0; border-bottom: 0; }
-  .project-table td:nth-child(2) { grid-column: 1 / -1; grid-row: 2; color: var(--muted); font-size: 14px; }
-  .project-table td:nth-child(3) { grid-column: 1 / -1; grid-row: 3; margin-top: 2px; }
-  .project-table td.links { grid-column: 2; grid-row: 1; }
-}
-
-#background td:first-child { white-space: nowrap; color: var(--ink-2); width: 150px; }
 
 .table-wrap { max-width: 100%; overflow-x: auto; margin: 8px 0 20px; }
 .table-wrap table { margin: 0; }
