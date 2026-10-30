@@ -219,8 +219,8 @@ Dismount-VHD -Path $vhdx</code></pre>
         <li><p><strong>Find the remaining handle holder</strong> with <code>handle64.exe -accepteula ext4.vhdx</code>, or in Resource Monitor on the CPU tab under Associated Handles.</p></li>
         <li>
           <p><strong>Export and reimport.</strong> This builds a new VHDX that contains only live data. The notes estimate the tar for 140 GiB of live data at roughly 100 GB or more, written to a different physical drive.</p>
-          <p>The notes give export, unregister and import as one sequence. Here they are split into two scripts, and the first one stops before anything is deleted. Save each as a <code>.ps1</code> file in <code>%USERPROFILE%\wsl-compact</code> and run it with <code>powershell -NoProfile -File</code>. Run from a file, a <code>throw</code> ends the script. Pasted into a console, the lines can run one at a time, depending on the console, and a failed line then does not stop the lines after it. The exit code checks and the verification import are additions by this article.</p>
-          <p><code>export-verify.ps1</code> exports the distro, checks the export, imports the tar under a second name and starts it. A full backup drive makes <code>wsl --export</code> fail; the script then stops. The verification import needs about as much free space on the backup drive as the distro's live data, in addition to the tar.</p>
+          <p>The notes give export, unregister and import as one sequence. Here they are split into two scripts, and the first one stops before anything is deleted. Save each as a <code>.ps1</code> file in <code>%USERPROFILE%\wsl-compact</code> and run it with <code>powershell -NoProfile -File</code>. Run from a file, a <code>throw</code> ends the script. Pasted into a console, the lines can run one at a time, depending on the console, and a failed line then does not stop the lines after it. The exit code checks, the hash check and the verification distro are additions by this article.</p>
+          <p><code>export-verify.ps1</code> exports the distro, checks the export, records the SHA-256 hash of the tar, imports the tar under a second name and starts it. A full backup drive makes <code>wsl --export</code> fail; the script then stops. The verification distro is kept: it is a second, started copy of the data and is removed only after the replacement has started. It needs about as much free space on the backup drive as the distro's live data, in addition to the tar. Hashing reads the whole tar, so each hash adds a full read of roughly 100 GB.</p>
           <pre><code>$ErrorActionPreference = 'Stop'
 $env:WSL_UTF8 = 1
 $work = "$env:USERPROFILE\wsl-compact"
@@ -230,25 +230,32 @@ wsl.exe --export &lt;distro&gt; $tar
 if ($LASTEXITCODE -ne 0) { throw "wsl --export exited with $LASTEXITCODE" }
 $exported = Get-Item -LiteralPath $tar
 if ($exported.Length -le 0) { throw "export file is empty: $tar" }
+$hash = (Get-FileHash -LiteralPath $tar -Algorithm SHA256).Hash
 wsl.exe --import &lt;distro&gt;-verify "&lt;backup drive&gt;:\&lt;distro&gt;-verify" $tar
 if ($LASTEXITCODE -ne 0) { throw "verification import exited with $LASTEXITCODE" }
 wsl.exe -d &lt;distro&gt;-verify -u root -- df -h /
 if ($LASTEXITCODE -ne 0) { throw "verification distro did not start" }
-wsl.exe --unregister &lt;distro&gt;-verify
-Set-Content -Path "$work\export-verified.txt" -Value $exported.Length
-Write-Output "EXPORT_VERIFIED bytes=$($exported.Length)"</code></pre>
-          <p>Run <code>replace.ps1</code> only after <code>export-verify.ps1</code> printed <code>EXPORT_VERIFIED</code>. It is the destructive step: <code>wsl --unregister</code> deletes the distro and its ext4.vhdx and cannot be undone. The script refuses to run when the verification record is missing or the tar has changed size since it was written.</p>
+wsl.exe --terminate &lt;distro&gt;-verify
+Set-Content -Path "$work\export-verified.txt" -Value $hash
+Write-Output "EXPORT_VERIFIED sha256=$hash"</code></pre>
+          <p>Run <code>replace.ps1</code> only after <code>export-verify.ps1</code> printed <code>EXPORT_VERIFIED</code>. It is the destructive step: <code>wsl --unregister</code> deletes the distro and its ext4.vhdx and cannot be undone. The script refuses to run when the verification record is missing, when the tar's SHA-256 hash differs from the recorded one, or when the verification distro is no longer registered. It removes the verification distro last, after the replacement has been imported and started; until then, a failed import leaves both the tar and the verification distro.</p>
           <pre><code>$ErrorActionPreference = 'Stop'
 $env:WSL_UTF8 = 1
 $work = "$env:USERPROFILE\wsl-compact"
 $tar = "&lt;backup drive&gt;:\&lt;distro&gt;-backup.tar"
-$verifiedBytes = [long](Get-Content -Path "$work\export-verified.txt")
-if ((Get-Item -LiteralPath $tar).Length -ne $verifiedBytes) { throw "tar size differs from the verified export" }
+$verifiedHash = (Get-Content -Path "$work\export-verified.txt").Trim()
+$currentHash = (Get-FileHash -LiteralPath $tar -Algorithm SHA256).Hash
+if ($currentHash -ne $verifiedHash) { throw "tar hash differs from the verified export" }
+if (@(wsl.exe --list --quiet) -notcontains '&lt;distro&gt;-verify') { throw "verification distro is not registered" }
 wsl.exe --shutdown
 wsl.exe --unregister &lt;distro&gt;
 if ($LASTEXITCODE -ne 0) { throw "wsl --unregister exited with $LASTEXITCODE" }
 wsl.exe --import &lt;distro&gt; "$env:LOCALAPPDATA\Packages\&lt;distro package&gt;\LocalState" $tar
-if ($LASTEXITCODE -ne 0) { throw "wsl --import exited with $LASTEXITCODE; the tar at $tar is the only copy" }
+if ($LASTEXITCODE -ne 0) { throw "wsl --import exited with $LASTEXITCODE; the tar and &lt;distro&gt;-verify are kept" }
+wsl.exe -d &lt;distro&gt; -u root -- df -h /
+if ($LASTEXITCODE -ne 0) { throw "reimported distro did not start; &lt;distro&gt;-verify is kept" }
+wsl.exe --unregister &lt;distro&gt;-verify
+if ($LASTEXITCODE -ne 0) { throw "wsl --unregister of the verification distro exited with $LASTEXITCODE" }
 Write-Output "REIMPORTED"</code></pre>
           <p>After the import the default user is root. Restore <code>/etc/wsl.conf</code>, keeping the existing <code>[boot]</code> section:</p>
           <pre><code>[boot]
