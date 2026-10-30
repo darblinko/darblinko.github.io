@@ -106,7 +106,12 @@ wsl.exe -d &lt;distro&gt; -u root -- docker ps</code></pre>
         </li>
         <li>
           <p><strong>Optional: exclude the distro directory from Microsoft Defender.</strong> Administrator. The notes' reasoning: Defender cannot read ext4 contents, and the block changes that compaction produces trigger a full rescan of a file estimated at about 250 GB.</p>
-          <pre><code>Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\Packages\&lt;distro package&gt;\LocalState"
+          <p>The exclusion persists until it is removed. The script below records whether the path was already excluded, adds it only if it was not, and step 9 removes only an exclusion added here. The record and the removal are additions by this article; the notes add the exclusion and do not remove it.</p>
+          <pre><code>$work = "$env:USERPROFILE\wsl-compact"
+$localState = "$env:LOCALAPPDATA\Packages\&lt;distro package&gt;\LocalState"
+$alreadyExcluded = @((Get-MpPreference).ExclusionPath) -contains $localState
+Set-Content -Path "$work\defender-exclusion.txt" -Value $(if ($alreadyExcluded) { 'PREEXISTING' } else { 'ADDED' })
+if (-not $alreadyExcluded) { Add-MpPreference -ExclusionPath $localState }
 (Get-MpPreference).ExclusionPath</code></pre>
         </li>
         <li>
@@ -155,6 +160,13 @@ Stop-Transcript</code></pre>
 wsl.exe -d &lt;distro&gt; -u root -- docker start &lt;container&gt;
 wsl.exe -d &lt;distro&gt; -u root -- docker logs --tail 30 &lt;container&gt;</code></pre>
           <p>Success: <code>FS_OK</code> prints, used space matches step 2, and the container log shows a clean start. Then re-enable the WSL extension and restore <code>window.restoreWindows</code>.</p>
+          <p>If step 4 ran, remove the exclusion it added. Administrator. A path that was excluded before step 4 stays excluded.</p>
+          <pre><code>$work = "$env:USERPROFILE\wsl-compact"
+$localState = "$env:LOCALAPPDATA\Packages\&lt;distro package&gt;\LocalState"
+if ((Get-Content -Path "$work\defender-exclusion.txt") -eq 'ADDED') {
+  Remove-MpPreference -ExclusionPath $localState
+}
+(Get-MpPreference).ExclusionPath</code></pre>
         </li>
       </ol>
       <aside class="note">
@@ -249,11 +261,11 @@ default=&lt;user&gt;</code></pre>
       <ul>
         <li><strong>Back up first.</strong> When the notes were written, no backup of the 140 GiB inside the VHDX existed, and the notes identify an interrupted in-place compaction as the one step that can leave the VHDX damaged. The <code>wsl --export</code> command from fallback 4, written to a different physical drive before step 7, provides that backup. Running it first is my recommendation; the recorded procedure does not include it.</li>
         <li><strong>Shut WSL down and keep it down.</strong> Any client that re-attaches the distro during compaction takes the handle back. On 2026-09-10 a Remote-WSL window did this within milliseconds of every shutdown.</li>
-        <li><strong>Administrator rights</strong> are needed for <code>diskpart</code> (step 7), <code>Add-MpPreference</code> (step 4), <code>Restart-Service WSLService</code> (step 5 fallback) and the Hyper-V cmdlets (fallback 2). Guest commands through <code>wsl.exe -u root</code>, <code>wsl --shutdown</code> and the size readings run unelevated. From an unelevated terminal each elevated step raises one UAC prompt, and an unattended prompt stalls the run.</li>
+        <li><strong>Administrator rights</strong> are needed for <code>diskpart</code> (step 7), <code>Add-MpPreference</code> (step 4), <code>Remove-MpPreference</code> (step 9), <code>Restart-Service WSLService</code> (step 5 fallback) and the Hyper-V cmdlets (fallback 2). Guest commands through <code>wsl.exe -u root</code>, <code>wsl --shutdown</code> and the size readings run unelevated. From an unelevated terminal each elevated step raises one UAC prompt, and an unattended prompt stalls the run.</li>
         <li><strong>Do not zero-fill free space</strong> in the guest to help compaction. The notes record that it would first inflate the VHDX toward the 1007 GiB virtual capacity, which the C: drive could not hold.</li>
         <li><strong>Do not click Format</strong> on any disk dialog during the run. A dialog means <code>automount disable</code> did not take effect; the notes say to dismiss it and abort.</li>
         <li><strong>Automount can stay disabled.</strong> If diskpart aborts between <code>automount disable</code> and <code>automount enable</code>, newly attached USB drives stop mounting. Recovery is <code>automount enable</code> from an elevated diskpart.</li>
-        <li><strong>The Defender exclusion</strong> in step 4 stops scanning of the distro directory. The notes accept that because Defender cannot read ext4 contents.</li>
+        <li><strong>The Defender exclusion</strong> in step 4 stops scanning of the distro directory until step 9 removes it. The notes accept that because Defender cannot read ext4 contents. If the run stops before step 9, the exclusion stays in place; <code>defender-exclusion.txt</code> records whether to remove it.</li>
         <li><strong>Scope.</strong> All observations come from one machine running WSL 2.7.10.0 with guest kernel 6.18.33.2-2. The notes do not record the Windows build. The compaction result was not measured, as stated above.</li>
       </ul>
       <aside class="note">
