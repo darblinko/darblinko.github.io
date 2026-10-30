@@ -27,7 +27,11 @@ EXTERNAL_SCHEMES = {"http", "https", "mailto", "data", "tel"}
 
 
 def is_number(value):
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+    )
 
 
 def chart_errors(chart):
@@ -36,7 +40,11 @@ def chart_errors(chart):
     kind = chart.get("type")
     if kind not in CHART_FIELDS:
         return [f"{name}: unknown type {kind!r}"]
-    errors = [f"{name}: missing {field}" for field in ["title", "source"] + CHART_FIELDS[kind] if field not in chart]
+    errors = [
+        f"{name}: missing {field}"
+        for field in ["title", "source"] + CHART_FIELDS[kind]
+        if field not in chart
+    ]
     if errors:
         return errors
     if chart.get("format", "number") not in FORMATS:
@@ -60,7 +68,9 @@ def chart_errors(chart):
                 errors.append(f"{name}: data[{i}].status is not pass or fail")
     elif kind == "stats":
         for i, tile in enumerate(chart["tiles"]):
-            if not isinstance(tile.get("label"), str) or not isinstance(tile.get("value"), str):
+            if not isinstance(tile.get("label"), str) or not isinstance(
+                tile.get("value"), str
+            ):
                 errors.append(f"{name}: tiles[{i}] needs string label and value")
     else:
         keys = chart["x"] if kind == "line" else chart["categories"]
@@ -69,13 +79,19 @@ def chart_errors(chart):
         for si, series in enumerate(chart["series"]):
             values = series.get("values")
             if not isinstance(series.get("name"), str) or not isinstance(values, list):
-                errors.append(f"{name}: series[{si}] needs a string name and a values list")
+                errors.append(
+                    f"{name}: series[{si}] needs a string name and a values list"
+                )
                 continue
             if len(values) != len(keys):
-                errors.append(f"{name}: series[{si}] has {len(values)} values for {len(keys)} keys")
+                errors.append(
+                    f"{name}: series[{si}] has {len(values)} values for {len(keys)} keys"
+                )
             for i, value in enumerate(values):
                 if value is not None and not is_number(value):
-                    errors.append(f"{name}: series[{si}].values[{i}] is not a finite number or null")
+                    errors.append(
+                        f"{name}: series[{si}].values[{i}] is not a finite number or null"
+                    )
     return errors
 
 
@@ -124,7 +140,9 @@ class ChartDataTest(unittest.TestCase):
                 charts = json.loads(data_file.read_text(encoding="utf-8"))["charts"]
                 names = [chart["name"] for chart in charts]
                 self.assertEqual(len(names), len(set(names)), "duplicate chart names")
-                self.assertEqual([error for chart in charts for error in chart_errors(chart)], [])
+                self.assertEqual(
+                    [error for chart in charts for error in chart_errors(chart)], []
+                )
 
     def test_schema_check_rejects_malformed_charts(self):
         base = {"name": "c", "title": "t", "source": "s"}
@@ -132,17 +150,36 @@ class ChartDataTest(unittest.TestCase):
             {**base, "type": "hbar", "data": [{}]},
             {**base, "type": "hbar", "data": [{"label": "a", "value": "1"}]},
             {**base, "type": "hbar", "data": [{"label": "a", "value": float("nan")}]},
-            {**base, "type": "hbar", "data": [{"label": "a", "value": 1, "status": "ok"}]},
+            {
+                **base,
+                "type": "hbar",
+                "data": [{"label": "a", "value": 1, "status": "ok"}],
+            },
             {**base, "type": "hbar", "max": 0, "data": [{"label": "a", "value": 0}]},
-            {**base, "type": "line", "x": [1, 2], "series": [{"name": "a", "values": [1, True]}]},
-            {**base, "type": "columns", "categories": ["a"], "series": [{"name": "a", "values": [1, 2]}]},
+            {
+                **base,
+                "type": "line",
+                "x": [1, 2],
+                "series": [{"name": "a", "values": [1, True]}],
+            },
+            {
+                **base,
+                "type": "columns",
+                "categories": ["a"],
+                "series": [{"name": "a", "values": [1, 2]}],
+            },
             {**base, "type": "stats", "tiles": [{"label": "a", "value": 1}]},
             {**base, "type": "pie"},
         ]
         for chart in malformed:
             with self.subTest(chart=chart):
                 self.assertNotEqual(chart_errors(chart), [])
-        valid = {**base, "type": "line", "x": [1, 2], "series": [{"name": "a", "values": [None, 2.5]}]}
+        valid = {
+            **base,
+            "type": "line",
+            "x": [1, 2],
+            "series": [{"name": "a", "values": [None, 2.5]}],
+        }
         self.assertEqual(chart_errors(valid), [])
 
     def test_every_chart_figure_has_data(self):
@@ -151,7 +188,9 @@ class ChartDataTest(unittest.TestCase):
             if not names:
                 continue
             with self.subTest(page=page.relative_to(ROOT)):
-                data = json.loads((page.parent / "data.json").read_text(encoding="utf-8"))
+                data = json.loads(
+                    (page.parent / "data.json").read_text(encoding="utf-8")
+                )
                 defined = {chart["name"] for chart in data["charts"]}
                 self.assertEqual(sorted(set(names) - defined), [])
 
@@ -161,7 +200,11 @@ class LinkTest(unittest.TestCase):
         parsed = {page.resolve(): parse(page) for page in PAGES}
         for page in PAGES:
             for tag, key, value in parsed[page.resolve()].references:
-                candidates = [item.split()[0] for item in value.split(",")] if key == "srcset" else [value]
+                candidates = (
+                    [item.split()[0] for item in value.split(",")]
+                    if key == "srcset"
+                    else [value]
+                )
                 for reference in candidates:
                     resolved = resolve(page.resolve(), reference)
                     if resolved is None:
@@ -170,7 +213,11 @@ class LinkTest(unittest.TestCase):
                     with self.subTest(page=page.relative_to(ROOT), reference=reference):
                         self.assertTrue(target.is_file(), f"{target} does not exist")
                         if fragment:
-                            ids = parsed[target].ids if target in parsed else parse(target).ids
+                            ids = (
+                                parsed[target].ids
+                                if target in parsed
+                                else parse(target).ids
+                            )
                             self.assertIn(fragment, ids)
 
 
@@ -181,7 +228,12 @@ class ScriptSyntaxTest(unittest.TestCase):
             self.skipTest("node is not installed")
         for script in sorted(ROOT.glob("assets/*.js")):
             with self.subTest(script=script.name):
-                result = subprocess.run([node, "--check", str(script)], capture_output=True, text=True)
+                result = subprocess.run(
+                    [node, "--check", str(script)],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
                 self.assertEqual(result.returncode, 0, result.stderr)
 
 
