@@ -1,6 +1,15 @@
 // Renders every <figure class="chart" data-chart="name"> from the page's chart data.
 // Data comes from <script type="application/json" id="chart-data"> when present,
-// otherwise from data.json next to the page. Schema: README.md, "Chart data".
+// otherwise from data.json next to the page. Data layout: {"charts": [chart, ...]}.
+// Every chart has name, type, title and source; subtitle, alt and format are optional.
+// format: percent (fractions, 0.86 prints 86%), number (default), decimal2, decimal3.
+// hbar: data [{label, value, status?, note?}], optional max, threshold {value, label};
+//   status "pass" or "fail" colors the bar.
+// columns: categories [...], series [{name, values}], optional max; null draws no bar.
+// line: x [...], series [{name, values}], optional min, max; null breaks the line, a
+//   point with no neighbour is drawn as a dot, the end label uses the last non-null value.
+// stats: tiles [{label, value (preformatted string), note?}].
+// At most 4 series are drawn. A chart that fails to draw shows its own error in its figure.
 (function () {
   "use strict";
 
