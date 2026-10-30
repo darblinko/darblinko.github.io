@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Claude writes, Codex reviews: a Stop-hook review gate capped at two rounds</title>
+  <title>Claude writes, Codex reviews: a Stop-hook review gate capped at two rounds per batch of changes</title>
   <meta name="description" content="How a Claude Code Stop hook sends uncommitted changes to Codex CLI for review, why each of its limits exists, and what 34 logged verdicts from two private repositories show.">
   <link rel="icon" href="data:,">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,7 +20,7 @@
 
   <main class="article">
     <section class="intro">
-      <h1>Claude writes, Codex reviews: a Stop-hook review gate capped at two rounds</h1>
+      <h1>Claude writes, Codex reviews: a Stop-hook review gate capped at two rounds per batch of changes</h1>
       <p class="lede">A Claude Code Stop hook in agent-controls runs the project's tests and a Codex CLI review of the uncommitted changes each time Claude tries to end its turn, and a change request sends Claude back to work. After 2 rounds on the same set of changed files the gate lets Claude stop and logs the open blockers. The original version of the gate logged 34 verdicts in two private repositories: 12 approvals, 18 change requests, 3 approvals at the round cap and 1 dispute.</p>
       <dl class="record">
         <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>

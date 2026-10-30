@@ -199,7 +199,7 @@
       </li>
       <li>
         <strong>agent-controls</strong>
-        <p>Codex sandboxing with bubblewrap, cross-agent review and per-profile Claude Code configuration. A Stop-hook gate runs tests and a second coding agent review, capped at two rounds.</p>
+        <p>Codex sandboxing with bubblewrap, cross-agent review and per-profile Claude Code configuration. A Stop-hook gate runs the tests and a Codex review of uncommitted changes, with at most 2 review verdicts per batch of changed files. A change to the <code>git status</code> output, including staging, starts a new batch; failed tests and reviewer errors use no round; at the cap Claude may stop with blockers open, which are logged.</p>
         <div class="links"><a href="https://darblinko.github.io/agent-controls/" aria-label="Results for agent-controls">Results</a><a href="https://github.com/darblinko/agent-controls" aria-label="Source for agent-controls">Source</a></div>
       </li>
       <li>
@@ -261,7 +261,7 @@
     <ul class="writing-list">
       <li><span class="draft">Draft</span><a href="/writing/golden-goose-evals/">Evaluating an agentic RAG system for regulatory audit support</a></li>
       <li><span class="draft">Draft</span><a href="/writing/cypher-guard/">Checking LLM-generated Cypher before it reaches a multi-tenant graph</a></li>
-      <li><span class="draft">Draft</span><a href="/writing/codex-review-gate/">A coding-agent review gate capped at two rounds</a></li>
+      <li><span class="draft">Draft</span><a href="/writing/codex-review-gate/">A coding-agent review gate capped at two rounds per batch of changes</a></li>
       <li><span class="draft">Draft</span><a href="/writing/car-diagnostic-agent/">An AI agent that talks to my car over KWP2000 and UDS</a></li>
       <li><span class="draft">Draft</span><a href="/writing/trading-agents-no-edge/">My LLM trading agents found no edge, and how I know</a></li>
       <li><span class="draft">Draft</span><a href="/writing/lookahead-audit-checklist/">Look-ahead bias in time-series ML: an audit checklist</a></li>
