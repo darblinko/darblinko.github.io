@@ -4,6 +4,7 @@ Run from the repository root: python3 -m unittest discover -s tests
 """
 
 import json
+import math
 import shutil
 import subprocess
 import unittest
@@ -20,7 +21,62 @@ CHART_FIELDS = {
     "stats": ["tiles"],
 }
 MAX_SERIES = 4
+FORMATS = {"percent", "number", "decimal2", "decimal3"}
+STATUSES = {"pass", "fail"}
 EXTERNAL_SCHEMES = {"http", "https", "mailto", "data", "tel"}
+
+
+def is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def chart_errors(chart):
+    """Return the schema violations of one chart, in the terms charts.js documents."""
+    name = chart.get("name", "<unnamed>")
+    kind = chart.get("type")
+    if kind not in CHART_FIELDS:
+        return [f"{name}: unknown type {kind!r}"]
+    errors = [f"{name}: missing {field}" for field in ["title", "source"] + CHART_FIELDS[kind] if field not in chart]
+    if errors:
+        return errors
+    if chart.get("format", "number") not in FORMATS:
+        errors.append(f"{name}: unknown format {chart['format']!r}")
+    for bound in ("max", "min"):
+        if bound in chart and not is_number(chart[bound]):
+            errors.append(f"{name}: {bound} is not a finite number")
+    if is_number(chart.get("max")) and chart["max"] <= 0 and kind != "line":
+        errors.append(f"{name}: max must be positive")
+    if "threshold" in chart and not is_number(chart["threshold"].get("value")):
+        errors.append(f"{name}: threshold value is not a finite number")
+    if kind == "hbar":
+        if not chart["data"]:
+            errors.append(f"{name}: data is empty")
+        for i, row in enumerate(chart["data"]):
+            if not isinstance(row.get("label"), str):
+                errors.append(f"{name}: data[{i}].label is not a string")
+            if not is_number(row.get("value")):
+                errors.append(f"{name}: data[{i}].value is not a finite number")
+            if "status" in row and row["status"] not in STATUSES:
+                errors.append(f"{name}: data[{i}].status is not pass or fail")
+    elif kind == "stats":
+        for i, tile in enumerate(chart["tiles"]):
+            if not isinstance(tile.get("label"), str) or not isinstance(tile.get("value"), str):
+                errors.append(f"{name}: tiles[{i}] needs string label and value")
+    else:
+        keys = chart["x"] if kind == "line" else chart["categories"]
+        if len(chart["series"]) > MAX_SERIES:
+            errors.append(f"{name}: more than {MAX_SERIES} series")
+        for si, series in enumerate(chart["series"]):
+            values = series.get("values")
+            if not isinstance(series.get("name"), str) or not isinstance(values, list):
+                errors.append(f"{name}: series[{si}] needs a string name and a values list")
+                continue
+            if len(values) != len(keys):
+                errors.append(f"{name}: series[{si}] has {len(values)} values for {len(keys)} keys")
+            for i, value in enumerate(values):
+                if value is not None and not is_number(value):
+                    errors.append(f"{name}: series[{si}].values[{i}] is not a finite number or null")
+    return errors
 
 
 class PageParser(HTMLParser):
@@ -68,14 +124,26 @@ class ChartDataTest(unittest.TestCase):
                 charts = json.loads(data_file.read_text(encoding="utf-8"))["charts"]
                 names = [chart["name"] for chart in charts]
                 self.assertEqual(len(names), len(set(names)), "duplicate chart names")
-                for chart in charts:
-                    self.assertIn(chart["type"], CHART_FIELDS, chart["name"])
-                    for field in ["title", "source"] + CHART_FIELDS[chart["type"]]:
-                        self.assertIn(field, chart, chart["name"])
-                    self.assertLessEqual(len(chart.get("series", [])), MAX_SERIES, chart["name"])
-                    keys = chart.get("x") or chart.get("categories") or []
-                    for series in chart.get("series", []):
-                        self.assertEqual(len(series["values"]), len(keys), chart["name"])
+                self.assertEqual([error for chart in charts for error in chart_errors(chart)], [])
+
+    def test_schema_check_rejects_malformed_charts(self):
+        base = {"name": "c", "title": "t", "source": "s"}
+        malformed = [
+            {**base, "type": "hbar", "data": [{}]},
+            {**base, "type": "hbar", "data": [{"label": "a", "value": "1"}]},
+            {**base, "type": "hbar", "data": [{"label": "a", "value": float("nan")}]},
+            {**base, "type": "hbar", "data": [{"label": "a", "value": 1, "status": "ok"}]},
+            {**base, "type": "hbar", "max": 0, "data": [{"label": "a", "value": 0}]},
+            {**base, "type": "line", "x": [1, 2], "series": [{"name": "a", "values": [1, True]}]},
+            {**base, "type": "columns", "categories": ["a"], "series": [{"name": "a", "values": [1, 2]}]},
+            {**base, "type": "stats", "tiles": [{"label": "a", "value": 1}]},
+            {**base, "type": "pie"},
+        ]
+        for chart in malformed:
+            with self.subTest(chart=chart):
+                self.assertNotEqual(chart_errors(chart), [])
+        valid = {**base, "type": "line", "x": [1, 2], "series": [{"name": "a", "values": [None, 2.5]}]}
+        self.assertEqual(chart_errors(valid), [])
 
     def test_every_chart_figure_has_data(self):
         for page in PAGES:
