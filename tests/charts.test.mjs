@@ -82,6 +82,43 @@ test("a column with a missing value draws no bar for it", async () => {
   assert.equal(figures[0].querySelectorAll("path").length, 2);
 });
 
+function attributesWithNaN(figure) {
+  return figure.querySelectorAll("path, line, rect, circle, polyline, text, svg")
+    .flatMap((element) => [...element.attributes].filter(([, value]) => value.includes("NaN")));
+}
+
+test("a horizontal chart whose values are all zero draws finite coordinates", async () => {
+  const chart = { name: "zeros", type: "hbar", title: "zeros", source: "test", data: [{ label: "Errors", value: 0 }] };
+  const { figures, errors } = await render([chart]);
+  assert.deepEqual(errors, []);
+  assert.ok(figures[0].querySelector("svg"));
+  assert.deepEqual(attributesWithNaN(figures[0]), []);
+});
+
+test("a horizontal chart row without label or value reports its own error", async () => {
+  const chart = { name: "blank", type: "hbar", title: "blank", source: "test", data: [{}] };
+  const { figures, errors } = await render([chart]);
+  assert.match(figures[0].textContent, /could not be drawn: data\[0\]\.label is not a string/);
+  assert.equal(errors.length, 1);
+});
+
+test("a non-numeric series value reports its own error", async () => {
+  const { figures } = await render([lineChart("text", [1, "2", 3])]);
+  assert.match(figures[0].textContent, /could not be drawn: series\[0\]\.values\[1\] is not a finite number/);
+});
+
+test("malformed inline chart data shows the loading error in every figure", async () => {
+  const document = createDocument();
+  const figures = [addChartFigure(document, "a"), addChartFigure(document, "b")];
+  const script = document.createElement("script");
+  script.setAttribute("id", "chart-data");
+  script.textContent = "{";
+  document.body.appendChild(script);
+  runScript(CHARTS, document);
+  await settle();
+  figures.forEach((figure) => assert.match(figure.textContent, /^Charts could not load: /));
+});
+
 test("clips play when on screen and pause when off screen", () => {
   const document = createDocument();
   const clip = document.createElement("video");
