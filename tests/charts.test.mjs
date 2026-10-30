@@ -1,11 +1,13 @@
 // Behavior checks for assets/charts.js and assets/media.js. Run: node --test tests/
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createDocument, addChartFigure, addInlineData, runScript, settle } from "./fake-dom.mjs";
 
 const CHARTS = fileURLToPath(new URL("../assets/charts.js", import.meta.url));
 const MEDIA = fileURLToPath(new URL("../assets/media.js", import.meta.url));
+const WRITING = fileURLToPath(new URL("../writing/", import.meta.url));
 
 function lineChart(name, values) {
   return { name, type: "line", title: name, source: "test", format: "number",
@@ -118,6 +120,49 @@ test("malformed inline chart data shows the loading error in every figure", asyn
   await settle();
   figures.forEach((figure) => assert.match(figure.textContent, /^Charts could not load: /));
 });
+
+function tableRows(figure) {
+  return figure.querySelector("tbody").querySelectorAll("tr")
+    .map((row) => row.querySelectorAll("td").map((cell) => cell.textContent));
+}
+
+for (const article of readdirSync(WRITING).sort()) {
+  let data;
+  try {
+    data = JSON.parse(readFileSync(WRITING + article + "/data.json", "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT") continue;
+    throw error;
+  }
+  test(`every chart in writing/${article}/data.json renders from fetch`, async () => {
+    const document = createDocument();
+    const figures = data.charts.map((chart) => addChartFigure(document, chart.name));
+    const requested = [];
+    const fetch = (url) => {
+      requested.push(url);
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) });
+    };
+    const { errors } = runScript(CHARTS, document, { fetch });
+    await settle();
+    assert.deepEqual(requested, ["data.json"]);
+    assert.deepEqual(errors, []);
+    data.charts.forEach((chart, i) => {
+      const figure = figures[i];
+      assert.equal(figure.querySelector(".chart-title").textContent, chart.title, chart.name);
+      assert.deepEqual(attributesWithNaN(figure), [], chart.name);
+      const rows = tableRows(figure);
+      if (chart.type === "hbar") {
+        assert.deepEqual(rows.map((row) => row[0]), chart.data.map((row) => row.label), chart.name);
+        rows.forEach((row) => assert.notEqual(row[1], "", chart.name));
+      } else if (chart.type === "stats") {
+        const shown = figure.querySelectorAll(".stat-value").map((tile) => tile.textContent);
+        assert.deepEqual(shown, chart.tiles.map((tile) => tile.value), chart.name);
+      } else {
+        assert.equal(rows.length, (chart.categories || chart.x).length, chart.name);
+      }
+    });
+  });
+}
 
 test("clips play when on screen and pause when off screen", () => {
   const document = createDocument();
