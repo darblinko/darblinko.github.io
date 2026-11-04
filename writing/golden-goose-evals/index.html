@@ -26,14 +26,14 @@
         <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
         <div><dt>Measured</dt><dd>2026-10-30</dd></div>
         <div><dt>Topic</dt><dd>Enterprise: regulated quality</dd></div>
-        <div><dt>Source</dt><dd><a href="https://github.com/darblinko/golden-goose">darblinko/golden-goose</a></dd></div>
-        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/golden-goose/tree/8218be3755416879747e5dea32235406c1441dcd"><code>8218be3</code></a></dd></div>
+        <div><dt>Source</dt><dd><a href="https://github.com/darblinko/golden-goose-qa">darblinko/golden-goose-qa</a></dd></div>
+        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/golden-goose-qa/tree/8218be3755416879747e5dea32235406c1441dcd"><code>8218be3</code></a></dd></div>
       </dl>
     </section>
 
     <section>
       <h2>Scope: what the system is for and what was measured</h2>
-      <p>golden-goose is a LangGraph agent that answers questions about a medical device quality management system. It uses hybrid retrieval in Qdrant, a Neo4j graph and a Postgres record warehouse, and each answer cites document ID, revision and page. Its <a href="https://darblinko.github.io/golden-goose/">project page</a> describes the system and the <a href="https://github.com/darblinko/golden-goose">repository</a> holds the code. This article covers the eval battery: what each metric computes, how the gates were set, what the one recorded run scored, and which architecture decision records (ADRs) refer to the measurement.</p>
+      <p>golden-goose is a LangGraph agent that answers questions about a medical device quality management system. It uses hybrid retrieval in Qdrant, a Neo4j graph and a Postgres record warehouse, and each answer cites document ID, revision and page. Its <a href="https://darblinko.github.io/golden-goose-qa/">project page</a> describes the system and the <a href="https://github.com/darblinko/golden-goose-qa">repository</a> holds the code. This article covers the eval battery: what each metric computes, how the gates were set, what the one recorded run scored, and which architecture decision records (ADRs) refer to the measurement.</p>
       <p>The intended-use statement scopes the system to decision support during regulatory audit preparation and live audit response. A trained user opens the cited revision and confirms each claim before relying on it. A human writes the response to the auditor. The system is read-only over quality records and is not a 21 CFR Part 11 electronic record or signature system.</p>
       <p>All evaluation data is synthetic. The repository generates a QMS for the fictional Halvern Medical infusion pump family, together with a golden question set and seeded defects. No figure in this article was measured on a real company's documents.</p>
       <aside class="note">

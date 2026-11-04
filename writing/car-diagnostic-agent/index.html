@@ -25,14 +25,14 @@
       <dl class="record">
         <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
         <div><dt>Topic</dt><dd>Industrial IoT</dd></div>
-        <div><dt>Source</dt><dd><a href="https://github.com/darblinko/obd-scanner">darblinko/obd-scanner</a></dd></div>
-        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/obd-scanner/tree/89e26e508c99f0c3ba07fab10fa1c9dafe5b2e90"><code>89e26e5</code></a></dd></div>
+        <div><dt>Source</dt><dd><a href="https://github.com/darblinko/q50-obd-scanner">darblinko/q50-obd-scanner</a></dd></div>
+        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/q50-obd-scanner/tree/89e26e508c99f0c3ba07fab10fa1c9dafe5b2e90"><code>89e26e5</code></a></dd></div>
       </dl>
     </section>
 
     <section>
       <h2>The agent calls tools and code builds the frames</h2>
-      <p>obd-scanner is a PySide6 desktop app (Python package <code>q50diag</code>) that reads a car over KWP2000, UDS and OBD-II through an ELM327 or STN USB adapter. MechanIQ is a Claude Agent SDK agent in a side panel of that app. The <a href="https://darblinko.github.io/obd-scanner/">project page</a> describes the app, its pages and how to run it. This article covers the design decisions behind the agent's access to the car, and what one session on a car recorded.</p>
+      <p>obd-scanner is a PySide6 desktop app (Python package <code>q50diag</code>) that reads a car over KWP2000, UDS and OBD-II through an ELM327 or STN USB adapter. MechanIQ is a Claude Agent SDK agent in a side panel of that app. The <a href="https://darblinko.github.io/q50-obd-scanner/">project page</a> describes the app, its pages and how to run it. This article covers the design decisions behind the agent's access to the car, and what one session on a car recorded.</p>
       <p>One diagnostic read on CAN takes several steps. The adapter needs a request header and a receive filter for the module's CAN IDs. A reply longer than one frame needs ISO 15765-2 flow control and reassembly. A module that needs more time answers <code>7F &lt;service&gt; 78</code> (response pending), and the request has to be repeated with a longer timeout. Before any of this, something has to decide whether the service ID may be sent at all. In obd-scanner each of these steps is Python code with tests. The agent decides what to read.</p>
       <p>The agent never receives a CAN ID or a serial handle. <code>read_module</code> takes a module name such as <code>EPS</code>. <code>raw_read</code> takes a module name and a hex payload such as <code>21 01</code>, or an adapter command such as <code>ATRV</code> without a module. The tool resolves the name to a request and response ID from the vehicle profile and returns JSON: decoded values with units, codes with their status, or the request and reply as text.</p>
       <p>The code shows three reasons for this split.</p>
@@ -66,7 +66,7 @@ flowchart TB
   session --> gate2 --> elm --> adapter --> ecu
       </pre>
       <aside class="note">
-        <p>All file references are to <a href="https://github.com/darblinko/obd-scanner">obd-scanner</a> at <code>89e26e5</code>.</p>
+        <p>All file references are to <a href="https://github.com/darblinko/q50-obd-scanner">obd-scanner</a> at <code>89e26e5</code>.</p>
         <p>App, package and protocols: <code>README.md</code>; <code>pyproject.toml</code> line 4.</p>
         <p>18 tools: <code>TOOL_SPECS</code>, <code>q50diag/mechaniq/tools.py</code> lines 673 to 743, counted with <code>ast</code>. Name lookup: <code>find_module</code>, lines 200 to 206.</p>
         <p>One owner: <code>q50diag/session.py</code> docstring, lines 1 to 8.</p>
@@ -182,7 +182,7 @@ flowchart TB
           </tbody>
         </table>
       </div>
-      <p>The 7 deny rules account for 36 cases. 22 more are allow cases, which act as controls: a guard that denied everything would fail them. The last 4 test the hook plumbing: other hook events pass through, relative paths resolve against the working directory, unbalanced quotes fall back to text checks, and segments split on separators. The <a href="https://darblinko.github.io/obd-scanner/">project page</a> charts the deny and allow counts. One of them is the commit <code>git commit -m "fix(mechaniq): push EPS reads earlier; COM5 note; reset --hard docs"</code>, whose message contains the words of three deny rules.</p>
+      <p>The 7 deny rules account for 36 cases. 22 more are allow cases, which act as controls: a guard that denied everything would fail them. The last 4 test the hook plumbing: other hook events pass through, relative paths resolve against the working directory, unbalanced quotes fall back to text checks, and segments split on separators. The <a href="https://darblinko.github.io/q50-obd-scanner/">project page</a> charts the deny and allow counts. One of them is the commit <code>git commit -m "fix(mechaniq): push EPS reads earlier; COM5 note; reset --hard docs"</code>, whose message contains the words of three deny rules.</p>
       <p>The Bash rules work on parsed commands. <code>shell_segments</code> splits a command with <code>shlex</code> into simple commands at <code>;</code>, <code>|</code>, <code>&amp;</code>, parentheses and line breaks, so quoted text stays inside its argument. For a segment that runs git, the subcommand is found after git's own options, which is how <code>git -C /x push --force</code> is caught. The serial patterns (<code>/dev/tty</code>, <code>/dev/serial</code>, <code>COMn</code>, <code>serial.Serial(</code>, <code>serial_for_url</code>, <code>miniterm</code>) apply to segments that do not run git. Redirect and <code>tee</code> targets are resolved against the working directory and checked as file writes; <code>/dev/null</code>, <code>/dev/stdout</code>, <code>/dev/stderr</code> and <code>$VARIABLE</code> targets are skipped. The secret check runs on the raw text before <code>shlex</code>, with backslashes turned into slashes, because <code>shlex</code> drops the backslashes of an unquoted Windows path. A command with unbalanced quotes falls back to regular expressions for push, discard and serial access.</p>
       <p>Each denial names what to do instead. The serial rule returns: "Bash may not open a serial device or adapter port: the q50diag app owns the connection. Use the q50 tools (raw_read, read_module, get_readings) for vehicle access. To search code for this text, use the Grep tool." Inference: the last sentence covers a code search whose text matches a serial pattern, such as a search for <code>/dev/tty</code>; a <code>Grep</code> call for <code>serial.Serial</code> is one of the allowed test cases.</p>
       <p>The same docstring states the limit: "The Bash checks are a guard against mistakes, not a sandbox: a script file can still do anything its interpreter allows."</p>
