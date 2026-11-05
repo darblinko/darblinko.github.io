@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Look-ahead bias in time-series ML: an audit checklist</title>
-  <meta name="description" content="Six look-ahead checks implemented in llm-trading-lab and claude-skills: what each catches, how to run it and what it measured, including a leak fix that moved 5-minute classifier accuracy from 74.4% to 49.9% and a triple-barrier label audit by year.">
+  <meta name="description" content="Six look-ahead checks implemented in llm-trading-lab and claude-skills: what each catches, how to run it and what it measured on synthetic bars, including a planted same-day merge leak that the correlation screen missed and the truncation test caught.">
   <link rel="icon" href="data:,">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,21 +24,21 @@
   <main class="article">
     <section class="intro">
       <h1>Look-ahead bias in time-series ML: an audit checklist</h1>
-      <p class="lede">Two repositories implement six look-ahead checks for an intraday ML pipeline, from resample alignment to a purge of walk-forward folds. On a private intraday feature set, fixing two leaks moved 5-minute classifier accuracy from 74.4% to 49.9%. On synthetic bars the correlation screen flagged one of the two planted leaks, and the truncation test flagged both.</p>
+      <p class="lede">Two repositories implement six look-ahead checks for an intraday ML pipeline, from resample alignment to a purge of walk-forward folds. On synthetic bars the correlation screen flagged one of the two planted leaks, and the truncation test flagged both. A daily-merge fix as first imported into claude-skills shifted the date key with the values and left the look-ahead in place.</p>
       <dl class="record">
         <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
         <div><dt>Topic</dt><dd>Quant trading research</dd></div>
         <div><dt>Source</dt><dd><a href="https://github.com/darblinko/llm-trading-lab">darblinko/llm-trading-lab</a></dd></div>
-        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/llm-trading-lab/tree/78e7b53fa4c9678a0b0292c86547b76019618322"><code>78e7b53</code></a></dd></div>
+        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/llm-trading-lab/tree/7e4ec74af0af83256070f7f7701aefe834390268"><code>7e4ec74</code></a></dd></div>
       </dl>
     </section>
 
     <section>
-      <h2>Scope: two repositories, private results, synthetic commands</h2>
+      <h2>Scope: two repositories, synthetic commands</h2>
       <p>llm-trading-lab holds the audit code in <code>src/leakage_audit/</code> and session-aligned walk-forward folds in <code>src/walkforward/</code>. Its <a href="https://darblinko.github.io/llm-trading-lab/">project page</a> covers the rest of the repository. <a href="https://github.com/darblinko/claude-skills">claude-skills</a> holds <code>ts-ml-lookahead-audit</code>, a Claude Code skill with a correlation audit and leak-free versions of a bucket resample and a daily merge. Claude loads the skill while it builds or reviews a time-series dataset, and <code>user-invocable: false</code> keeps it out of the slash-command menu.</p>
-      <p>The article uses two kinds of evidence. The result tables in <code>data/results/</code> were exported once from private research runs on vendor data, and the repository cannot regenerate them. Every command shown here runs on synthetic random-walk bars. Each chart and table below states which kind it holds.</p>
+      <p>Every result in this article is the output of a command run on synthetic random-walk bars. llm-trading-lab publishes no result tables, so the article reports no measurement on market data.</p>
       <aside class="note">
-        <p>llm-trading-lab at <code>78e7b53</code>: <code>README.md</code> lines 38 to 41 and 353 to 354. Export and provenance: <code>data/results/README.md</code> lines 3 to 7; README lines 367 and 368.</p>
+        <p>llm-trading-lab at <code>7e4ec74</code>: <code>README.md</code> lines 19 to 22 and 126 to 127. No result tables: README lines 65 to 69 and 140 to 141.</p>
         <p>claude-skills at <code>85d2aee</code>: <code>README.md</code> lines 28 and 84; <code>skills/ts-ml-lookahead-audit/SKILL.md</code> line 4 (<code>user-invocable: false</code>).</p>
       </aside>
     </section>
@@ -93,32 +93,14 @@ flowchart TD
       </pre>
       <p>Checks 1 to 3 inspect features, checks 4 and 5 inspect the labels, and check 6 inspects how labels and folds meet. In llm-trading-lab a research candidate goes through the leakage audit before any gate. The Stage A gate measures expectancy only, and on synthetic data an entry family that peeks five bars ahead passes it.</p>
       <aside class="note">
-        <p>Order of audit and gates: <code>README.md</code> lines 59 to 60 and 78 to 80; peeking family passes Stage A: lines 376 and 377 (<code>python -m swing_backtest.demo</code>).</p>
+        <p>Order of audit and gates: <code>README.md</code> lines 40 to 42 and 59 to 61; peeking family passes Stage A: lines 143 and 144 (<code>python -m swing_backtest.demo</code>).</p>
       </aside>
     </section>
 
     <section>
-      <h2>Measured: two feature leaks, before and after the fix</h2>
-      <p>Two leaks were found in a private intraday feature set. A five-minute resample with <code>transform("last")</code> gave each bar its bucket's closing value. A daily volatility index close joined on the bar's date gave the 09:30 bar the close published at 16:15. The clean feature set (v4) fixed both. The export gives the reported metrics of 5- and 10-minute models trained on each set.</p>
-      <figure class="chart" data-chart="leak-fix-classifier"></figure>
-      <figure class="chart" data-chart="leak-fix-regression"></figure>
-      <div class="table-wrap"><table>
-        <thead>
-          <tr><th>Horizon</th><th>Model</th><th>Metric</th><th class="num">Leaked (v3)</th><th class="num">Clean (v4)</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>5-minute</td><td>Classifier</td><td>Accuracy</td><td class="num">0.744</td><td class="num">0.499</td></tr>
-          <tr><td>5-minute</td><td>Classifier</td><td>F1</td><td class="num">0.747</td><td class="num">0.595</td></tr>
-          <tr><td>5-minute</td><td>Regression</td><td>R²</td><td class="num">0.467</td><td class="num">-0.062</td></tr>
-          <tr><td>5-minute</td><td>Regression</td><td>Directional accuracy</td><td class="num">0.737</td><td class="num">0.508</td></tr>
-          <tr><td>10-minute</td><td>Classifier</td><td>Accuracy</td><td class="num">0.730</td><td class="num">0.498</td></tr>
-          <tr><td>10-minute</td><td>Classifier</td><td>F1</td><td class="num">0.740</td><td class="num">0.620</td></tr>
-          <tr><td>10-minute</td><td>Regression</td><td>R²</td><td class="num">0.456</td><td class="num">-0.015</td></tr>
-          <tr><td>10-minute</td><td>Regression</td><td>Directional accuracy</td><td class="num">0.725</td><td class="num">0.502</td></tr>
-        </tbody>
-      </table></div>
-      <p>With clean features both classifiers are within 0.2 percentage points of 50% accuracy, and both regression R² values are below 0. Inference: nearly all of the accuracy above 50% in the v3 models came from the two leaks. The export does not separate the two fixes, so the contribution of each leak is not known. The skill sets its red flag for this case at above 65% on binary direction prediction for short-horizon returns, and at accuracy that does not fall between in-sample and out-of-sample periods.</p>
-      <p><code>src/leakage_audit/patterns.py</code> reproduces both patterns with their fixes. On the 17,550-bar synthetic sample (45 sessions, seed 0), <code>python -m leakage_audit --data bars_1min.csv --plant-leaks</code> reports:</p>
+      <h2>Two planted leaks: correlation screen and truncation test</h2>
+      <p><code>src/leakage_audit/patterns.py</code> reproduces two look-ahead patterns found in an intraday dataset, each with its fix. A five-minute resample with <code>transform("last")</code> gives every bar in a bucket the bucket's closing value, so the 10:01 bar sees 10:04. A daily close joined on the bar's date lets the 09:30 bar see the 16:00 close. The skill gives two red flags for a model that reads features like these: above 65% accuracy on binary direction prediction for short-horizon returns, and accuracy that does not fall between in-sample and out-of-sample periods.</p>
+      <p>On the 17,550-bar synthetic sample (45 sessions, seed 0), <code>python -m leakage_audit --data bars_1min.csv --plant-leaks</code> reports:</p>
       <div class="table-wrap"><table>
         <thead>
           <tr><th>Planted feature</th><th>Correlation screen</th><th>Truncation test</th></tr>
@@ -130,10 +112,9 @@ flowchart TD
       </table></div>
       <p>The same-day merge feature misses the 0.15 threshold by 0.0076. The 11 clean features score between 0.0003 and 0.0219. Inference: the leaked value is the return to the session close, which spans up to 389 bars, so the 5-bar target is a small part of it and the linear correlation stays low. The truncation test compares values directly and does not depend on correlation.</p>
       <aside class="note">
-        <p>Leaks and metrics: <code>README.md</code> lines 168 to 173; <code>data/results/leak_fix_before_after.csv</code> lines 2 to 9. Export at source revision <code>03a5c5c</code> (2026-04-13); the 15-minute row was not exported: <code>data/results/README.md</code> line 16.</p>
-        <p>Within 0.2 points: 0.500 minus 0.499 and 0.498, computed.</p>
+        <p>Patterns: <code>src/leakage_audit/patterns.py</code> lines 1 to 7; <code>README.md</code> lines 82 to 84.</p>
         <p>Skill red flags: <code>SKILL.md</code> lines 112 and 113.</p>
-        <p>Synthetic run: <code>python scripts/make_sample_data.py</code>, then <code>python -m leakage_audit --data data/sample/bars_1min.csv --plant-leaks</code> at <code>78e7b53</code>; report lines 7, 11 and 12. README lines 175 to 178 and 335.</p>
+        <p>Synthetic run: <code>python scripts/make_sample_data.py</code>, then <code>python -m leakage_audit --data data/sample/bars_1min.csv --plant-leaks</code>, re-run at <code>7e4ec74</code> on 2026-11-05; report lines 7, 11 and 12. README lines 84 to 87 and 108.</p>
         <p>|r| 0.1424 and the clean range: <code>correlation_audit</code> with <code>threshold=0.0</code> on the same frame, sample of 5,000 rows, seed 42.</p>
         <p>Session length: <code>SESSION_MINUTES = 389</code>, <code>src/walkforward/features.py</code> line 9.</p>
       </aside>
@@ -181,7 +162,7 @@ df.merge(daily_shifted, left_on="date", right_on="date")</code></pre>
 
     <section>
       <h2>Fold overlap and purge</h2>
-      <p>By default <code>add_forward_returns</code> computes targets across session boundaries, as the original private run did, so the last bars of a session take their target from the next session's prices. In an expanding walk-forward split the last training session is followed by the first test session. With a 10-bar target the last 10 training rows of each fold read test-fold prices. The synthetic sample shows this count in every fold, and <code>--purge-bars 10</code> removes it:</p>
+      <p>By default <code>add_forward_returns</code> computes targets across session boundaries, as the original run did, so the last bars of a session take their target from the next session's prices. In an expanding walk-forward split the last training session is followed by the first test session. With a 10-bar target the last 10 training rows of each fold read test-fold prices. The synthetic sample shows this count in every fold, and <code>--purge-bars 10</code> removes it:</p>
       <div class="table-wrap"><table>
         <thead>
           <tr><th>Fold</th><th class="num">Train rows, no purge</th><th class="num">Rows reading the test fold</th><th class="num">Train rows, purge 10</th><th class="num">Rows reading the test fold</th></tr>
@@ -193,45 +174,34 @@ df.merge(daily_shifted, left_on="date", right_on="date")</code></pre>
         </tbody>
       </table></div>
       <p>The purge has to cover the longest forward reach among the targets. The audit command measures overlap at 10 bars, the walk-forward default horizon. It also builds triple-barrier labels with a 30-bar window for the balance check. Inference: a model trained on those labels would need a 30-bar purge; the repository trains no model on them.</p>
-      <p>The private screener export has 21 folds per model for xgboost and random forest. Training sets grow from 10,776 to 48,943 rows and test folds hold 1,771 to 1,950 rows. The README records as an inference that this run computed 10-bar targets across session boundaries with no purge, and that the effect on its fold AUCs was not measured. The fold table cannot settle the question. Inference: in expanding mode a purge of p rows lowers every training size by p and leaves the differences between folds unchanged.</p>
       <aside class="note">
         <p>Targets: <code>src/walkforward/labels.py</code> lines 3 to 6, 17 and 22 to 26. Purge: <code>folds.py</code> lines 28 to 29 and 50 to 54.</p>
-        <p>Synthetic: <code>python -m leakage_audit --data bars_1min.csv</code> with and without <code>--purge-bars 10</code> at <code>78e7b53</code>, Fold overlap tables. README lines 337 and 338.</p>
+        <p>Synthetic: <code>python -m leakage_audit --data bars_1min.csv</code> with and without <code>--purge-bars 10</code>, re-run at <code>7e4ec74</code> on 2026-11-05, Fold overlap tables. README lines 110 and 111.</p>
         <p>Horizons: <code>leakage_audit/__main__.py</code> lines 19 and 41; <code>walkforward/backtest.py</code> line 22.</p>
-        <p>Screener: <code>data/results/walkforward_folds.csv</code>, 42 rows; fold sizes computed. README lines 180 and 372 to 375; <code>data/results/README.md</code> line 19.</p>
       </aside>
     </section>
 
     <section>
-      <h2>Triple-barrier label audit by year</h2>
+      <h2>Triple-barrier labeler and barrier balance</h2>
       <p>The labeler starts each window at the next bar, gives the lower label when one bar touches both barriers, and leaves the last <code>max_bars</code> bars unlabeled. A unit test checks the window and the unlabeled tail on a 6-bar frame. Two rule sets then apply to the label shares. The hard gate checks the upper and lower shares against 5% to 80% in every year and fails the audit when one falls outside. The diagnostic checks all three shares against 10% to 70% and only warns. A separate chop rule warns when the timeout share over the whole sample exceeds 40%.</p>
-      <p>The exported audit covers 8 label configurations from 2016 to 2026, with 2026 a partial year. Four ATR-scaled configurations are under the hard gate and four fixed-percent configurations under the diagnostic.</p>
-      <figure class="chart" data-chart="label-audit-counts"></figure>
-      <figure class="chart" data-chart="label-audit-warnings"></figure>
-      <p>In the ATR-scaled configurations the upper share ranges from 37.5% to 44.2% and the lower share from 55.5% to 62.2% across all 44 config-years. Their timeout share is 0.3% to 1.0%, which the hard gate does not check. The README describes the 2017 trend_pct row by its timeout share of 0.764. The same row has an upper share of 0.045, which is outside the diagnostic band and below the hard gate's 5% floor.</p>
-      <p>Computed here and absent from the export: weighting each year by its rows, the timeout share over 2016 to 2026 is 44.2% for trend_pct, above the 40% chop limit, and 29.5% to 31.3% for the other three fixed-percent configurations. The export omits sections 2 onward of the source report, so whether the source applied the chop rule is not known.</p>
       <p>On the synthetic sample the audit command labels with 0.3% barriers and a 30-bar window and reports one year: upper 37.0%, lower 36.4%, timeout 26.5%, PASS, and 26.5% against the 40% chop limit.</p>
       <aside class="note">
         <p>Labeler: <code>barrier.py</code> lines 26 and 31 to 41. Test: <code>tests/leakage_audit/test_leakage_audit.py</code> lines 77 to 99. Rules: <code>barrier.py</code> lines 3 to 7, 52 to 54 and 77 to 79.</p>
-        <p>Counts and shares: <code>data/results/label_audit_by_year.csv</code>, 88 rows; README lines 281 to 285. trend_pct 2017 is line 69. Source report at revision <code>b50a9f9</code> (2026-05-01), section 1 only: <code>data/results/README.md</code> lines 24 and 44 to 46.</p>
-        <p>Ranges and row-weighted timeout shares computed from the CSV with Python's <code>csv</code> module.</p>
-        <p>Synthetic: barrier settings at <code>leakage_audit/__main__.py</code> line 41; report balance table of the run above.</p>
+        <p>Synthetic: barrier settings at <code>leakage_audit/__main__.py</code> line 41; balance table of the planted-leak report above, re-run at <code>7e4ec74</code>, lines 24 to 28.</p>
       </aside>
     </section>
 
     <section>
       <h2>Limits of these results</h2>
       <ul>
-        <li><strong>Real data.</strong> Three exports come from private runs on vendor data: the leak fix table, the label audit by year and the 21-fold walk-forward table. None of them can be regenerated from the repository, and the repository code computes features from OHLCV where the private screener used vendor indicator columns.</li>
         <li><strong>Synthetic data.</strong> Every command output in this article, both planted-leak runs, the fold overlap counts and the resample measurements in claude-skills come from random-walk bars. They show which patterns read the future. They do not measure the size of the effect on a real model.</li>
-        <li><strong>Not measured.</strong> The effect of the missing purge on the 21-fold AUCs, which average 0.6171 for xgboost and 0.6216 for random forest. The separate effect of each of the two leak fixes. The 15-minute models, which were not exported. The staged repositories do not record which check first found the two leaks in the private run.</li>
+        <li><strong>Not measured.</strong> The effect of either leak, or of a missing purge, on a model trained on market data. llm-trading-lab publishes no result tables and computes features from OHLCV only.</li>
         <li><strong>Correlation thresholds.</strong> The skill calls 0.15 and 0.05 rules of thumb. A leak whose effect is nonlinear can pass a Pearson screen, and the screen inspects one feature at a time against one target. The planted same-day merge leak passed it at 0.1424.</li>
         <li><strong>Truncation scope.</strong> The test needs a feature function that can be rerun on a prefix of the data. In the demonstration the daily closes are derived from the bars being cut. Inference from the code: a daily file loaded from outside the bars is not cut with them, so its rows published after the cut have to be dropped for the test to see a same-day merge.</li>
-        <li><strong>Label checks.</strong> Barrier balance and the label audit test label quality and the label window. They do not test features. The repository labeler uses fixed-percent barriers only; the ATR-scaled labeler behind the hard-gate rows is not in it.</li>
+        <li><strong>Label checks.</strong> Barrier balance and the label audit test label quality and the label window. They do not test features. The repository labeler uses fixed-percent barriers only.</li>
       </ul>
       <aside class="note">
-        <p>Real and synthetic: <code>README.md</code> lines 367 to 371; <code>data/results/README.md</code> lines 16, 19, 24 and 34 to 36. claude-skills <code>README.md</code> line 167.</p>
-        <p>Mean AUCs: <code>README.md</code> lines 217 and 218. Missing purge: lines 372 to 375.</p>
+        <p>Synthetic data and no result tables: <code>README.md</code> lines 65 to 69 and 140 to 142. claude-skills <code>README.md</code> line 167.</p>
         <p>Thresholds: <code>SKILL.md</code> line 53; <code>skills/ts-ml-lookahead-audit/README.md</code> lines 48 to 50.</p>
         <p>Daily closes from bars: <code>src/leakage_audit/demo.py</code> lines 22 and 30; <code>patterns.py</code> lines 38 to 44. Fixed-percent labeler: <code>barrier.py</code> lines 20 to 25 and 32 to 33.</p>
       </aside>

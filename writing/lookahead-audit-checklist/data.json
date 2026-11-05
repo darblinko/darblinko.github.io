@@ -1,40 +1,10 @@
 {
   "meta": {
     "repo": "llm-trading-lab",
-    "revision": "78e7b53",
+    "revision": "7e4ec74",
     "measured": "2026-10-28"
   },
   "charts": [
-    {
-      "name": "leak-fix-classifier",
-      "type": "columns",
-      "title": "Classifier accuracy with leaked (v3) and clean (v4) features",
-      "subtitle": "Private intraday run, reported metrics exported once; both leaks fixed together in v4",
-      "source": "llm-trading-lab data/results/leak_fix_before_after.csv lines 4 and 8",
-      "alt": "5-minute classifier accuracy is 74.4 percent with leaked features and 49.9 percent with clean features. 10-minute accuracy is 73 percent and 49.8 percent.",
-      "format": "percent",
-      "max": 1,
-      "categories": ["5-minute", "10-minute"],
-      "series": [
-        {"name": "leaked features (v3)", "values": [0.744, 0.73]},
-        {"name": "clean features (v4)", "values": [0.499, 0.498]}
-      ]
-    },
-    {
-      "name": "leak-fix-regression",
-      "type": "columns",
-      "title": "Regression directional accuracy with leaked (v3) and clean (v4) features",
-      "subtitle": "Same private run; the metric is named directional_accuracy in the export",
-      "source": "llm-trading-lab data/results/leak_fix_before_after.csv lines 3 and 7",
-      "alt": "5-minute regression directional accuracy is 73.7 percent with leaked features and 50.8 percent with clean features. 10-minute is 72.5 percent and 50.2 percent.",
-      "format": "percent",
-      "max": 1,
-      "categories": ["5-minute", "10-minute"],
-      "series": [
-        {"name": "leaked features (v3)", "values": [0.737, 0.725]},
-        {"name": "clean features (v4)", "values": [0.508, 0.502]}
-      ]
-    },
     {
       "name": "resample-future-reads",
       "type": "columns",
@@ -49,37 +19,6 @@
         {"name": "leaky: transform(\"last\")", "values": [0.8, 0.7729, 0.9]},
         {"name": "row-count shift", "values": [0.0, 0.0, 0.4]},
         {"name": "previous bucket per day", "values": [0.0, 0.0, 0.0]}
-      ]
-    },
-    {
-      "name": "label-audit-counts",
-      "type": "stats",
-      "title": "Triple-barrier label audit, 2016 to 2026, by configuration and year",
-      "subtitle": "Private label set; 4 ATR-scaled configurations under the hard gate, 4 fixed-percent under the diagnostic",
-      "source": "llm-trading-lab data/results/label_audit_by_year.csv, 88 rows",
-      "alt": "44 of 44 ATR config-years pass the hard gate. 39 of 44 fixed-percent config-years pass the diagnostic and 5 warn.",
-      "tiles": [
-        {"label": "ATR config-years passing the hard gate", "value": "44 of 44"},
-        {"label": "Fixed-percent config-years passing the diagnostic", "value": "39 of 44"},
-        {"label": "Fixed-percent config-years with a warning", "value": "5 of 44", "note": "2 in 2017, 3 in 2022"}
-      ]
-    },
-    {
-      "name": "label-audit-warnings",
-      "type": "hbar",
-      "title": "Label shares outside the 10% to 70% diagnostic band",
-      "subtitle": "The five fixed-percent config-years with a warning; trend_pct 2017 has two shares outside",
-      "source": "llm-trading-lab data/results/label_audit_by_year.csv lines 52, 63, 69, 80 and 85",
-      "alt": "In 2017 trend_pct has a vertical share of 76.4 percent and an upper share of 4.5 percent, and trend_ext_pct an upper share of 9.9 percent. In 2022 the vertical share is 4.6 percent for meanrev_pct and trend_ext_pct and 4.1 percent for scalp_pct.",
-      "format": "percent",
-      "max": 1,
-      "data": [
-        {"label": "trend_pct 2017, vertical", "value": 0.764, "note": "above the 70% ceiling"},
-        {"label": "trend_pct 2017, upper", "value": 0.045, "note": "below the 10% floor"},
-        {"label": "trend_ext_pct 2017, upper", "value": 0.099, "note": "below the 10% floor"},
-        {"label": "meanrev_pct 2022, vertical", "value": 0.046, "note": "below the 10% floor"},
-        {"label": "trend_ext_pct 2022, vertical", "value": 0.046, "note": "below the 10% floor"},
-        {"label": "scalp_pct 2022, vertical", "value": 0.041, "note": "below the 10% floor"}
       ]
     }
   ]

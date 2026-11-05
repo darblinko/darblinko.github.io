@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>62 of 83 prompt change records contain the falsifier keyword</title>
-  <meta name="description" content="The prompt change record format in llm-trading-lab (before, after, diff, rationale with trigger, expected change and falsifier, and a changelog link), why each field exists, and how complete 83 recorded changes are by the repository's own convention checks.">
+  <title>Prompt change records and the limits of their keyword checks</title>
+  <meta name="description" content="The prompt change record format in llm-trading-lab (before, after, diff, rationale with trigger, expected change and falsifier, and a changelog link), why each field exists, and what the validator's keyword checks can and cannot show.">
   <link rel="icon" href="data:,">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +15,6 @@
     main td code { white-space: nowrap; }
     main td.wrap code { white-space: normal; }
     pre.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
-    main td.num { white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -26,31 +25,28 @@
 
   <main class="article">
     <section class="intro">
-      <h1>62 of 83 prompt change records contain the falsifier keyword</h1>
-      <p class="lede">In llm-trading-lab a prompt change is recorded as the text before, the text after, their diff, and a rationale that names the trigger, the expected behavior change and the observation that would show the change was wrong. Across 83 records written from May to October 2026, 95.2% have all four files, 74.7% contain the string "falsif" and 63.9% contain "expected", the lowest of seven checks. The three rationale checks are keyword searches, and the unfilled template passes all three, so these shares measure the form of the records. They do not show that a falsifier was written or that any test was run.</p>
+      <h1>Prompt change records and the limits of their keyword checks</h1>
+      <p class="lede">In llm-trading-lab a prompt change is recorded as the text before, the text after, their diff, and a rationale that names the trigger, the expected behavior change and the observation that would show the change was wrong. A validator checks each record against seven convention rules. The three rationale checks are keyword searches, and the unfilled template passes all three, so a passing record shows the form of a rationale. It does not show that a falsifier was written or that any test was run.</p>
       <dl class="record">
         <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
         <div><dt>Topic</dt><dd>Quant trading: LLM operations</dd></div>
         <div><dt>Source</dt><dd><a href="https://github.com/darblinko/llm-trading-lab">darblinko/llm-trading-lab</a></dd></div>
-        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/llm-trading-lab/tree/78e7b53fa4c9678a0b0292c86547b76019618322"><code>78e7b53</code></a></dd></div>
+        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/llm-trading-lab/tree/7e4ec74af0af83256070f7f7701aefe834390268"><code>7e4ec74</code></a></dd></div>
       </dl>
       <aside class="note">
-        <p>83 records, May to October: <code>data/results/prompt_history_by_month.csv</code> rows 2 to 6 sum to 83.</p>
-        <p>95.2% is 79 of 83, 74.7% is 62 of 83, 63.9% is 53 of 83: <code>data/results/prompt_history_compliance.csv</code> rows 3, 7 and 6. The seven record checks are rows 2 to 8.</p>
-        <p>Keyword checks: <code>src/prompt_history/validate.py</code> lines 33 to 42.</p>
+        <p>Seven checks: <code>src/prompt_history/index.py</code> lines 17 to 25. Keyword checks: <code>src/prompt_history/validate.py</code> lines 33 to 42.</p>
+        <p>Unfilled template passes: <code>tests/prompt_history/test_prompt_history.py</code> lines 43 to 45.</p>
       </aside>
     </section>
 
     <section>
-      <h2>Scope: one package, one export, no prompt text</h2>
-      <p>llm-trading-lab is research tooling for LLM trading agents. Its <a href="https://darblinko.github.io/llm-trading-lab/">project page</a> covers the whole repository: the call gate, the walk-forward runner, the leakage audit and the negative results. This article covers one package, <a href="https://github.com/darblinko/llm-trading-lab/tree/78e7b53fa4c9678a0b0292c86547b76019618322/src/prompt_history"><code>src/prompt_history/</code></a>, which writes a change record for each prompt edit, validates a tree of records against the convention, and counts how many records pass each check.</p>
-      <p>The counts come from one run of <code>python -m prompt_history index</code> on the prompt history and changelog of a private research repository at revision <code>27c1a59</code> (2026-10-21). The export holds counts only. The private tree cannot be regenerated from the public repository, and records written after that revision are not counted.</p>
+      <h2>Scope: one package, no prompt text</h2>
+      <p>llm-trading-lab is research tooling for LLM trading agents. Its <a href="https://darblinko.github.io/llm-trading-lab/">project page</a> covers the whole repository: the call gate, the walk-forward runner and the leakage audit. This article covers one package, <a href="https://github.com/darblinko/llm-trading-lab/tree/7e4ec74af0af83256070f7f7701aefe834390268/src/prompt_history"><code>src/prompt_history/</code></a>, which writes a change record for each prompt edit, validates a tree of records against the convention, and counts how many records pass each check.</p>
       <p>Neither the repository nor this article contains live prompt text. The one example record in the repository is fictional, and this article does not reproduce its prompt snapshots.</p>
       <aside class="note">
         <p>Package commands: <code>src/prompt_history/__main__.py</code> lines 3 to 7.</p>
-        <p>Provenance: <code>data/results/README.md</code> lines 25 to 27 (source revision <code>27c1a59</code>, 2026-10-21, all prompt text not exported); lines 3 to 7 (tables cannot be regenerated).</p>
-        <p>No live prompts: <code>README.md</code> line 25 and lines 381 to 383. Example is fictional: <code>examples/prompt_history/records/2026-01-05_entry_review_require-volume-confirmation/rationale.md</code> line 3.</p>
-        <p>Code cited at <code>78e7b53</code> (<code>git rev-parse --short HEAD</code>). CSV row numbers in these notes count the header as row 1.</p>
+        <p>No live prompts: <code>README.md</code> line 7 and lines 146 to 148. Example is fictional: <code>examples/prompt_history/records/2026-01-05_entry_review_require-volume-confirmation/rationale.md</code> line 3.</p>
+        <p>Code cited at <code>7e4ec74</code> (<code>git show 7e4ec74:&lt;path&gt;</code>).</p>
       </aside>
     </section>
 
@@ -74,13 +70,13 @@
         </tbody>
       </table></div>
       <p>The expected change and the falsifier answer different questions. The expected change is a count that shows the edited prompt altered what the agent does. The falsifier is an observation that shows the altered behavior did not serve its purpose. Inference: a change can produce its expected change and still be falsified, which is the case the falsifier exists to catch.</p>
-      <p>The changelog entry is a separate document with its own template: Files, Trigger, Change, Why, Contradiction check, Validation and Status are required, and Outcome is filled in after at least one session. The repository does not define the Contradiction check field; the example entry fills it with "none found".</p>
+      <p>The changelog entry is a separate document with its own template: Files, Trigger, Change, Why, Contradiction check, Validation and Status are required, and Outcome is filled in after at least one session. A field counts when its bold label is present; the parser does not check that text follows the label. The repository does not define the Contradiction check field; the example entry fills it with "none found".</p>
       <aside class="note">
         <p>Layout and files: <code>src/prompt_history/record.py</code> lines 3 to 5 and 15. Folder pattern: line 18. Name and slug rules: lines 16 to 17 and 44 to 49. Identical before and after refused: lines 71 to 72. Existing folder refused: line 74 (<code>exist_ok=False</code>); test <code>tests/prompt_history/test_prompt_history.py</code> lines 37 to 40.</p>
         <p>Rationale template: <code>record.py</code> lines 20 to 41; trigger 22 to 24, rule 26 to 28, expected change 30 to 32, falsifier 34 to 36, cross-references 38 to 40.</p>
         <p>Diff: <code>record.py</code> lines 52 to 59. Comparison of changed lines: <code>src/prompt_history/validate.py</code> lines 18 to 30 and 54 to 58; drift test lines 43 to 48.</p>
         <p>Per-month and per-prompt counts from folder names: <code>src/prompt_history/index.py</code> lines 42 to 55. Changelog link: <code>validate.py</code> lines 63 to 64.</p>
-        <p>Changelog fields: <code>src/prompt_history/changelog.py</code> lines 3 to 4 and 12 to 21. Contradiction check in the example: <code>examples/prompt_history/CHANGELOG.md</code> line 11.</p>
+        <p>Changelog fields: <code>src/prompt_history/changelog.py</code> lines 3 to 4 and 12 to 21. Label parsing: line 37. Contradiction check in the example: <code>examples/prompt_history/CHANGELOG.md</code> line 11.</p>
         <p>The reasons for the snapshots and the two rationale fields are this article's reading of the template text and the validator; the repository states no other reason.</p>
       </aside>
     </section>
@@ -106,71 +102,49 @@ flowchart TD
       <p>Each LLM call made by the live loop is written to a daily markdown trace with its prompt name, payload, raw response, parsed result and token usage, and two review apps show the traces on the price chart. A session review that leads to a prompt change starts a record.</p>
       <p>Code covers three steps: writing the record, validating a tree of records, and indexing it into counts. The rationale, the changelog entry and the falsification check are written and done by a person. No code in the repository reads a falsifier or evaluates it against the traces. The two branches after the falsifier check are drawn from the example record, whose falsifier ends with the instruction to revert; the repository does not define what the Outcome field must contain.</p>
       <aside class="note">
-        <p>Trace and review apps: <code>README.md</code> lines 71 to 73. Session review leading to a record: lines 73 to 76.</p>
+        <p>Trace and review apps: <code>README.md</code> lines 52 to 54. Session review leading to a record: lines 54 to 57.</p>
         <p>Commands: <code>src/prompt_history/__main__.py</code> lines 3 to 7. Outcome after at least one session: <code>changelog.py</code> lines 3 to 4.</p>
         <p>Revert instruction: example <code>rationale.md</code> lines 19 to 23. Dashed edges mark steps inferred from the example or run on demand.</p>
       </aside>
     </section>
 
     <section>
-      <h2>Convention check results for the 83 records</h2>
+      <h2>The seven convention checks</h2>
       <p>Each check is a rule in <code>validate.py</code>. The index runs the validator on every record folder and counts the records that show none of the problems belonging to a check.</p>
-      <div class="table-wrap wide"><table>
+      <div class="table-wrap"><table>
         <thead>
-          <tr><th>Check</th><th class="num">Passing</th><th>A record passes when</th></tr>
+          <tr><th>Check</th><th>A record passes when</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>follows_naming_convention</code></td><td class="num">72 of 83</td><td>the folder name matches <code>YYYY-MM-DD_&lt;prompt_name&gt;_&lt;slug&gt;</code></td></tr>
-          <tr><td><code>has_all_four_files</code></td><td class="num">79 of 83</td><td><code>before.md</code>, <code>after.md</code>, <code>diff.patch</code> and <code>rationale.md</code> all exist</td></tr>
-          <tr><td><code>diff_matches_snapshots</code></td><td class="num">76 of 83</td><td>the added and removed lines of <code>diff.patch</code> equal those of a diff recomputed from the snapshots; a missing snapshot or patch fails</td></tr>
-          <tr><td><code>names_trigger</code></td><td class="num">70 of 83</td><td><code>rationale.md</code> contains "trigger" in any case</td></tr>
-          <tr><td><code>states_expected_change</code></td><td class="num">53 of 83</td><td><code>rationale.md</code> contains "expected"</td></tr>
-          <tr><td><code>states_falsifier</code></td><td class="num">62 of 83</td><td><code>rationale.md</code> contains "falsif"</td></tr>
-          <tr><td><code>linked_from_changelog</code></td><td class="num">79 of 83</td><td>the folder name appears in the changelog text</td></tr>
+          <tr><td><code>follows_naming_convention</code></td><td>the folder name matches <code>YYYY-MM-DD_&lt;prompt_name&gt;_&lt;slug&gt;</code></td></tr>
+          <tr><td><code>has_all_four_files</code></td><td><code>before.md</code>, <code>after.md</code>, <code>diff.patch</code> and <code>rationale.md</code> all exist</td></tr>
+          <tr><td><code>diff_matches_snapshots</code></td><td>the added and removed lines of <code>diff.patch</code> equal those of a diff recomputed from the snapshots; a missing snapshot or patch fails</td></tr>
+          <tr><td><code>names_trigger</code></td><td><code>rationale.md</code> contains "trigger" in any case</td></tr>
+          <tr><td><code>states_expected_change</code></td><td><code>rationale.md</code> contains "expected"</td></tr>
+          <tr><td><code>states_falsifier</code></td><td><code>rationale.md</code> contains "falsif"</td></tr>
+          <tr><td><code>linked_from_changelog</code></td><td>the folder name appears in the changelog text</td></tr>
         </tbody>
       </table></div>
-      <figure class="chart" data-chart="record-checks"></figure>
-      <p>The three rationale checks also fail when <code>rationale.md</code> is missing. Of the 7 records that fail the diff check, up to 4 can be records with a missing snapshot or patch, so between 3 and 7 records have a diff that disagrees with their snapshots. This range is derived from the two counts; the export has no per-record results.</p>
-      <p>All 83 folder names begin with a date: the month counts sum to 83, and the index counts a month only for a folder that starts with one. The 11 names that break the rest of the convention are grouped as "(name outside convention)" in the per-prompt table, and the other 72 records cover 10 prompt names. No record is dated August 2026.</p>
-      <figure class="chart" data-chart="records-by-month"></figure>
+      <p>The three rationale checks also fail when <code>rationale.md</code> is missing.</p>
       <aside class="note">
         <p>Checks and markers: <code>src/prompt_history/index.py</code> lines 16 to 36. Rules: <code>record.py</code> line 18; <code>validate.py</code> lines 33 to 65. Missing rationale fails the three rationale checks: <code>index.py</code> lines 16 and 21 to 23.</p>
-        <p>Passing counts: <code>data/results/prompt_history_compliance.csv</code> rows 2 to 8. Shares: 72/83 = 86.7%, 79/83 = 95.2%, 76/83 = 91.6%, 70/83 = 84.3%, 53/83 = 63.9%, 62/83 = 74.7%.</p>
-        <p>Diff range: 83 minus 76 is 7 failing; 83 minus 79 is 4 records missing a file; 7 minus 4 is 3.</p>
-        <p>Months: <code>data/results/prompt_history_by_month.csv</code> rows 2 to 6 (1, 34, 14, 23, 11); August has no row. Month counting: <code>index.py</code> lines 14 and 53 to 54.</p>
-        <p>11 outside the convention: <code>prompt_history_by_prompt.csv</code> row 4 and compliance row 2 (83 minus 72). 10 prompt names: the other 10 rows of the per-prompt table, rows 2, 3 and 5 to 12, sum to 72.</p>
       </aside>
     </section>
 
     <section>
-      <h2>The changelog side: 127 entries</h2>
-      <p>The same run parsed the private changelog into 127 entries. A field counts when its bold label is present; the parser does not check that text follows the label. Trigger is present in all 127 entries, and Validation in 92. Outcome is present in 125, so 2 entries were still pending when the export was taken.</p>
-      <figure class="chart" data-chart="changelog-fields"></figure>
-      <p>The changelog has 44 more entries than there are records. Inference: the example changelog states that every change to trading logic or to an LLM prompt gets an entry, so if the private changelog follows the same rule, some of the 44 are changes to trading logic. The export does not split entries by kind, and it does not say which entry links to which record.</p>
-      <aside class="note">
-        <p>127 entries and field counts: <code>data/results/prompt_history_compliance.csv</code> rows 9 to 16. Shares: 123/127 = 96.9%, 125/127 = 98.4%, 126/127 = 99.2%, 92/127 = 72.4%.</p>
-        <p>Label parsing: <code>src/prompt_history/changelog.py</code> line 37. Entry start: line 22. Outcome deferred: lines 3 to 4 and 21.</p>
-        <p>44 is 127 minus 83. Changelog scope in the example: <code>examples/prompt_history/CHANGELOG.md</code> line 3.</p>
-      </aside>
-    </section>
-
-    <section>
-      <h2>What the failed checks mean in practice</h2>
-      <p>Each item below is an inference from the field definitions and the counts. None was checked against the 83 records, whose text is private.</p>
+      <h2>What a failed check means</h2>
+      <p>Each item below is an inference from the field definitions and the validator rules.</p>
       <ul>
-        <li><strong>No "expected" keyword: 30 records (36.1%).</strong> The rationale lacks the word, so the template heading was removed or not used. If such a rationale also states no expected change in other words, it gives no count to look for in the traces, and the record alone cannot show whether the edited prompt changed what the agent did.</li>
-        <li><strong>No "falsif" keyword: 21 records (25.3%).</strong> The rationale lacks the word and the template's Falsifier heading. If it also names no failure observation in other words, keeping or reverting the change rests on a judgment that the record does not capture.</li>
-        <li><strong>Both keywords present: between 32 and 53 records.</strong> 53 contain "expected" and 62 contain "falsif", so at least 32 contain both. The per-record results needed for the exact figure were not exported.</li>
-        <li><strong>No "trigger" keyword in the rationale: 13 records (15.7%).</strong> Every changelog entry carries a Trigger label, so the trigger for some of these records may sit in the linked changelog entry. The export does not join records to entries, so this is unmeasured.</li>
-        <li><strong>No Validation field: 35 of 127 changelog entries (27.6%).</strong> Those entries do not say how the change was to be validated. The example entry fills the field with paper trading and a reminder to fill Outcome after at least one session.</li>
-        <li><strong>Not linked from the changelog: 4 records.</strong> These cannot be found from the changelog by folder name.</li>
-        <li><strong>Diff disagrees with snapshots: 3 to 7 records.</strong> A snapshot was edited after the record was written, or the patch was made from different text. The diff then no longer describes the change exactly. The repository's test for this check edits <code>after.md</code> after recording and expects this failure.</li>
+        <li><strong>No "expected" keyword.</strong> The rationale lacks the word, so the template heading was removed or not used. If such a rationale also states no expected change in other words, it gives no count to look for in the traces, and the record alone cannot show whether the edited prompt changed what the agent did.</li>
+        <li><strong>No "falsif" keyword.</strong> The rationale lacks the word and the template's Falsifier heading. If it also names no failure observation in other words, keeping or reverting the change rests on a judgment that the record does not capture.</li>
+        <li><strong>No "trigger" keyword in the rationale.</strong> The changelog template also has a Trigger field, so the trigger for such a record may sit in the linked changelog entry. The validator does not join records to entries, so this is not checked.</li>
+        <li><strong>No Validation field in a changelog entry.</strong> The entry does not say how the change was to be validated. The example entry fills the field with paper trading and a reminder to fill Outcome after at least one session.</li>
+        <li><strong>Not linked from the changelog.</strong> The record cannot be found from the changelog by folder name.</li>
+        <li><strong>Diff disagrees with snapshots.</strong> A snapshot was edited after the record was written, or the patch was made from different text. The diff then no longer describes the change exactly. The repository's test for this check edits <code>after.md</code> after recording and expects this failure.</li>
       </ul>
-      <p>The keyword rule bounds what the shares can show. A test in the repository records a change, leaves the rationale as the unfilled template and expects the validator, run without a changelog, to report no problem, because the template's own headings contain "Trigger", "Expected" and "Falsifier". For records written from the template, each share is therefore an upper bound on filled sections. In the other direction, a rationale that states an expected change without the word "expected" counts as failing.</p>
+      <p>The keyword rule bounds what a passing check can show. A test in the repository records a change, leaves the rationale as the unfilled template and expects the validator, run without a changelog, to report no problem, because the template's own headings contain "Trigger", "Expected" and "Falsifier". For a record written from the template, a passing rationale check therefore does not show that the section was filled in. In the other direction, a rationale that states an expected change without the word "expected" fails.</p>
       <aside class="note">
-        <p>30 is 83 minus 53; 30/83 = 36.1%. 21 is 83 minus 62; 21/83 = 25.3%. 13 is 83 minus 70; 13/83 = 15.7%. 32 is 53 plus 62 minus 83. Source rows: <code>data/results/prompt_history_compliance.csv</code> rows 5 to 7.</p>
-        <p>35 is 127 minus 92; 35/127 = 27.6% (row 14). Trigger in 127 of 127: row 10. 4 not linked: row 8, 83 minus 79.</p>
-        <p>Example Validation field: <code>examples/prompt_history/CHANGELOG.md</code> line 12.</p>
+        <p>Changelog Trigger field: <code>changelog.py</code> lines 12 to 20. Example Validation field: <code>examples/prompt_history/CHANGELOG.md</code> line 12.</p>
         <p>Drift test: <code>tests/prompt_history/test_prompt_history.py</code> lines 43 to 48; the unfilled template passes at lines 44 to 45. Keyword rule: <code>validate.py</code> lines 33 to 42. Template headings: <code>record.py</code> lines 22, 30 and 34.</p>
       </aside>
     </section>
@@ -206,35 +180,32 @@ flowchart TD
         <p>Files: <code>examples/prompt_history/</code>. Line counts: <code>wc -l</code> on <code>before.md</code> (4) and <code>after.md</code> (7). Diff: <code>diff.patch</code> line 3 (one hunk), lines 7 to 9 (3 added lines), no removed lines.</p>
         <p>Rationale sections, quoted: <code>rationale.md</code> lines 7 to 8, 12, 16 to 17, 21 to 23 and 27.</p>
         <p>Changelog entry: <code>CHANGELOG.md</code> lines 5 to 14; Prompt history line 14.</p>
-        <p>Validator output: the command at <code>README.md</code> line 332, run at <code>78e7b53</code>; exit status 0. Long lines wrap at narrow widths.</p>
-        <p>Example passes every check: test lines 83 to 92. 9 tests: <code>pytest -q tests/prompt_history</code>, 9 passed.</p>
+        <p>Validator output: the command at <code>README.md</code> line 105, run on a <code>git archive</code> extract of <code>7e4ec74</code>; exit status 0. Long lines wrap at narrow widths.</p>
+        <p>Example passes every check: test lines 83 to 92. 9 tests: <code>pytest -q tests/prompt_history</code> on the same extract, 9 passed.</p>
       </aside>
     </section>
 
     <section>
       <h2>Limits of this result</h2>
       <ul>
-        <li><strong>One snapshot of a private tree.</strong> The counts describe the prompt history at <code>27c1a59</code> on 2026-10-21. They cannot be regenerated from the public repository, and records added after that revision are not in them.</li>
-        <li><strong>Keyword checks.</strong> The rationale checks look for three words. An unfilled template passes them, and a rationale that uses other words fails them. The 83 records were not read for this article.</li>
-        <li><strong>No outcomes.</strong> The export counts Outcome labels. It does not count falsifiers that were observed, changes that were reverted or changes that were kept. Whether any stated falsifier was ever checked against the traces is not recorded in the repository.</li>
-        <li><strong>No per-record or per-month compliance.</strong> Overlaps between checks are given as ranges. The export cannot show whether the share of records with an expected change rose over the six months, or when the private tree adopted the template.</li>
+        <li><strong>Keyword checks.</strong> The rationale checks look for three words. An unfilled template passes them, and a rationale that uses other words fails them.</li>
+        <li><strong>No outcomes.</strong> The index counts Outcome labels. It does not count falsifiers that were observed, changes that were reverted or changes that were kept. Whether any stated falsifier was ever checked against the traces is not recorded in the repository.</li>
+        <li><strong>Counts only.</strong> The index writes counts per check, per month and per prompt name, and no per-record results. Overlaps between checks cannot be computed from its output.</li>
         <li><strong>Records and changelog are not joined.</strong> The link check confirms a folder name appears in the changelog. It does not confirm the linked entry describes the same change.</li>
-        <li><strong>No prompt text.</strong> The record structure and the counts are published; the prompts are not. The example record is fictional and is not one of the 83.</li>
+        <li><strong>No prompt text.</strong> The record structure and the validator are published; the prompts are not. The example record is fictional.</li>
       </ul>
       <aside class="note">
-        <p>Snapshot and regeneration: <code>data/results/README.md</code> lines 3 to 7 and 25 to 27.</p>
         <p>Keyword checks: <code>validate.py</code> lines 33 to 42; unfilled template passes: test lines 43 to 45.</p>
-        <p>Exported columns: <code>prompt_history_compliance.csv</code> header <code>check,passing,of</code>; <code>index.py</code> lines 65 to 89.</p>
-        <p>Link check: <code>validate.py</code> lines 63 to 64. No prompt text: <code>README.md</code> lines 381 to 383.</p>
+        <p>Index outputs: <code>index.py</code> lines 65 to 89; compliance header <code>check,passing,of</code> at line 75.</p>
+        <p>Link check: <code>validate.py</code> lines 63 to 64. No prompt text: <code>README.md</code> lines 146 to 148.</p>
       </aside>
     </section>
   </main>
 
   <footer>
-    Text and figures CC BY 4.0. Figures generated from <code>data.json</code> in this directory.
+    Text and figures CC BY 4.0.
   </footer>
 
-  <script src="../../assets/charts.js" defer></script>
   <script type="module">
     import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
     const dark = document.documentElement.dataset.theme === "dark" ||
