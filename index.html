@@ -185,11 +185,6 @@
     <h3 class="subhead">More engineering work</h3>
     <ul class="more-work">
       <li>
-        <strong>cypher-guard</strong>
-        <p>Checks model-written Cypher for read-only access and tenant scope before it reaches the database. The first version accepted 19 queries that read another tenant's data; the revised checker rejects all 19.</p>
-        <div class="links"><a href="https://nysara-global-llc.github.io/cypher-guard/" aria-label="Results for cypher-guard">Results</a><a href="https://github.com/Nysara-Global-LLC/cypher-guard" aria-label="Source for cypher-guard">Source</a></div>
-      </li>
-      <li>
         <strong>agent-controls</strong>
         <p>Codex sandboxing with bubblewrap, cross-agent review and per-profile Claude Code configuration. A Stop-hook gate runs the tests and a Codex review of uncommitted changes, with at most 2 review verdicts per batch of changed files. A change to the <code>git status</code> output, including staging, starts a new batch; failed tests and reviewer errors use no round; at the cap Claude may stop with blockers open, which are logged.</p>
         <div class="links"><a href="https://darblinko.github.io/agent-controls/" aria-label="Results for agent-controls">Results</a><a href="https://github.com/darblinko/agent-controls" aria-label="Source for agent-controls">Source</a></div>
@@ -198,11 +193,6 @@
         <strong>industrial-monitor</strong>
         <p>Vibration monitoring over MQTT with FFT and envelope anomaly detection, and a maintenance assistant that cites its sources. On a second simulated plant (seed 202), with the threshold frozen after calibration on the first (seed 101), it detected 94.7% of 1,805 fault windows and raised false alarms on 0.93% of 1,395 healthy windows, as recorded in <code>results/detection.json</code> at industrial-monitor 8e74634. All sensor data is simulated.</p>
         <div class="links"><a href="https://darblinko.github.io/industrial-monitor/" aria-label="Results for industrial-monitor">Results</a><a href="https://github.com/darblinko/industrial-monitor" aria-label="Source for industrial-monitor">Source</a></div>
-      </li>
-      <li>
-        <strong>cb_explorer</strong>
-        <p>Python call graphs, pinned analyzers, SARIF and a read-only MCP server. A self scan of the package at cb_explorer 25a1e6b indexes 1,030 symbols and 8,217 graph edges, as recorded in <code>docs/measurements/self_scan.md</code>.</p>
-        <div class="links"><a href="https://nysara-global-llc.github.io/cb_explorer/" aria-label="Results for cb_explorer">Results</a><a href="https://github.com/Nysara-Global-LLC/cb_explorer" aria-label="Source for cb_explorer">Source</a></div>
       </li>
       <li>
         <strong>claude-skills</strong>
@@ -252,7 +242,6 @@
     </div>
     <ul class="writing-list">
       <li><span class="draft">Draft</span><a href="/writing/golden-goose-evals/">Evaluating an agentic RAG system for regulatory audit support</a></li>
-      <li><span class="draft">Draft</span><a href="/writing/cypher-guard/">Checking LLM-generated Cypher before it reaches a multi-tenant graph</a></li>
       <li><span class="draft">Draft</span><a href="/writing/codex-review-gate/">A coding-agent review gate capped at two rounds per batch of changes</a></li>
       <li><span class="draft">Draft</span><a href="/writing/car-diagnostic-agent/">An AI agent that talks to my car over KWP2000 and UDS</a></li>
       <li><span class="draft">Draft</span><a href="/writing/trading-agents-no-edge/">My LLM trading agents found no edge, and how I know</a></li>
