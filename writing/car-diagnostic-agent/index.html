@@ -26,7 +26,7 @@
         <div><dt>Published</dt><dd>2026-10-28 (draft)</dd></div>
         <div><dt>Topic</dt><dd>Industrial IoT</dd></div>
         <div><dt>Source</dt><dd><a href="https://github.com/darblinko/q50-obd-scanner">darblinko/q50-obd-scanner</a></dd></div>
-        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/q50-obd-scanner/tree/89e26e508c99f0c3ba07fab10fa1c9dafe5b2e90"><code>89e26e5</code></a></dd></div>
+        <div><dt>Revision</dt><dd><a href="https://github.com/darblinko/q50-obd-scanner/tree/11cc392d68e7927f5331758ef7cec4808f38b92d"><code>11cc392</code></a></dd></div>
       </dl>
     </section>
 
@@ -66,7 +66,7 @@ flowchart TB
   session --> gate2 --> elm --> adapter --> ecu
       </pre>
       <aside class="note">
-        <p>All file references are to <a href="https://github.com/darblinko/q50-obd-scanner">obd-scanner</a> at <code>89e26e5</code>.</p>
+        <p>All file references are to <a href="https://github.com/darblinko/q50-obd-scanner">obd-scanner</a> at <code>11cc392</code>.</p>
         <p>App, package and protocols: <code>README.md</code>; <code>pyproject.toml</code> line 4.</p>
         <p>18 tools: <code>TOOL_SPECS</code>, <code>q50diag/mechaniq/tools.py</code> lines 673 to 743, counted with <code>ast</code>. Name lookup: <code>find_module</code>, lines 200 to 206.</p>
         <p>One owner: <code>q50diag/session.py</code> docstring, lines 1 to 8.</p>
@@ -85,13 +85,13 @@ flowchart TB
         <li>Response pending. After a <code>7F xx 78</code> reply the ELM prints its prompt and stops listening. The driver repeats the request once with adaptive timing off (<code>ATAT0</code>) and the longest timeout (<code>ATSTFF</code>: 255 units of 4 ms, 1.02 s), then restores <code>ATAT1</code>.</li>
       </ul>
       <p>Adapter commands from the console or from <code>raw_read</code> pass to the adapter with three exceptions in <code>console_command</code>. Input containing a line break or a NUL byte is refused. An empty line is refused, because the ELM327 repeats the last request on an empty line. Nine command prefixes are refused, which the error message calls adapter programming and baud changes: <code>ATPP</code>, <code>ATBRD</code>, <code>ATBRT</code>, <code>STP</code>, <code>STBR</code>, <code>STWBR</code>, <code>STSBR</code>, <code>STRSTNVM</code> and <code>VTUPDATE</code>. The <code>STP</code> prefix also covers the protocol command that the app itself sends at setup. Hex lines typed on the console go through the same allowlist as every other request.</p>
-      <p>None of the 714 tests needs an adapter. <code>tests/fake_serial.py</code> emulates the byte stream of a vLinker FS, an OBDLink EX and a plain ELM327, and a simulator transport answers for every vehicle profile.</p>
+      <p>None of the 717 tests needs an adapter. <code>tests/fake_serial.py</code> emulates the byte stream of a vLinker FS, an OBDLink EX and a plain ELM327, and a simulator transport answers for every vehicle profile.</p>
       <aside class="note">
         <p>Setup sequences: <code>q50diag/transport/elm.py</code> lines 42 to 43. Bus commands: <code>transport/adapters.py</code> line 32.</p>
         <p>Addressing, flow control, timeout: <code>elm.py</code> lines 284 to 316; the quoted comment is line 298. Q50 response offsets <code>(0x20, 8)</code>: <code>vehicles/q50.py</code> line 41.</p>
         <p>Response pending: <code>elm.py</code> lines 331 to 350; the 1.02 s retry timeout is line 345.</p>
         <p>Console filter: <code>transport/elm_parse.py</code> lines 135 to 149; the empty line message is line 141.</p>
-        <p>714 tests: <code>pytest --collect-only -q</code> and <code>pytest -q</code> (714 passed, 93.19 s) with <code>QT_QPA_PLATFORM=offscreen</code> on 2026-10-28, a local run at <code>89e26e5</code>. The collected count is also in <code>README.md</code> lines 17 and 161 at that revision; the pass result is as reported from the run. Emulated adapters: <code>README.md</code>, "Safety tests".</p>
+        <p>717 tests: <code>pytest --collect-only -q</code> with <code>QT_QPA_PLATFORM=offscreen</code> on 2026-11-05, a local run at <code>11cc392</code>. <code>pytest -q</code> in the same run: 716 passed and 1 failed, <code>test_paint_budget_for_nine_gauges</code>, a paint time budget, while other jobs ran on the machine; <code>tests/test_gui_analog_gauge.py</code> run alone then passed 42 of 42. <code>README.md</code> lines 17 and 165 at that revision give 714, the count collected at an earlier revision. Emulated adapters: <code>README.md</code>, "Safety tests".</p>
       </aside>
     </section>
 
@@ -217,14 +217,13 @@ flowchart TB
         </table>
       </div>
       <p>12 of the 15 addresses in the Q50 profile answered. AWD (748), STEERING ANGLE (75C) and ADAS (707) did not.</p>
-      <p>Two modules store three codes, each with status 0x08: confirmed, not currently failing. The EPS, ECM and ABS store none. The engine has the MIL off, 0 OBD-II codes and all readiness monitors complete. None of the three stored codes has a description in the app's code table, and the document states that their Q50 meanings need the factory service manual.</p>
-      <figure class="chart" data-chart="dtc-coverage"></figure>
+      <p>Two modules store three codes, each with status 0x08: confirmed, not currently failing. The EPS, ECM and ABS store none. The engine has the MIL off, 0 OBD-II codes and all readiness monitors complete. The repository ships no trouble code descriptions. The app reads them from a file the user supplies, and a code with no entry in that file shows an empty description. The document states that the Q50 meanings of the three stored codes need the factory service manual.</p>
       <p>The OBD port on this car is gatewayed. An unfiltered 5 s bus monitor received 0 broadcast frames, so every value in the session was polled from a module. The Q50 prompt notes pass this to the agent, with broadcast IDs such as 0x002, 0x300 and 0x5E4 listed as not readable at the port.</p>
       <aside class="note">
         <p>Vehicle, adapter, complaint: <code>docs/q50-findings-2026-10-17.md</code> lines 1 to 4.</p>
         <p>Modules and codes: lines 9 to 23. Engine: line 10. Gateway: line 11.</p>
         <p>12 of 15: the 15 entries of <code>KNOWN_MODULES</code> (<code>protocol/modules.py</code> lines 10 to 26) compared with the 12 named modules in the findings table. The module docstring, lines 4 to 5, gives the same count.</p>
-        <p>Descriptions: <code>data/dtc_descriptions.py</code>; counts by <code>len()</code> after import (465, 12, 0); <code>describe_generic()</code> returns an empty string for C1A01, C1A16 and B00A0, and none is a key of <code>NISSAN_DESCRIPTIONS</code> (lines 312 to 329).</p>
+        <p>Descriptions: <code>q50diag/data/dtc_descriptions.py</code> lines 1 to 17; <code>README.md</code> lines 149 to 151 and 175. With no file present, <code>describe_generic()</code> returns an empty string for C1A01, C1A16 and B00A0.</p>
         <p>Prompt notes: <code>vehicles/q50.py</code> lines 15 to 16.</p>
       </aside>
     </section>
@@ -323,10 +322,9 @@ flowchart TB
   </main>
 
   <footer>
-    Text and figures CC BY 4.0. Figures generated from <code>data.json</code> in this directory.
+    Text and figures CC BY 4.0.
   </footer>
 
-  <script src="../../assets/charts.js" defer></script>
   <script type="module">
     import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
     const dark = document.documentElement.dataset.theme === "dark" ||
